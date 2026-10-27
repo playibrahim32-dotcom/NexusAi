@@ -1,0 +1,12 @@
+workflows:
+  nexusai-web-workflow:
+    name: NexusAI Web Build
+    max_build_duration: 30
+    environment:
+      node: latest
+    scripts:
+      - name: Install dependencies / Prepare
+        script: |
+          echo "Preparing NexusAI build..."
+    artifacts:
+      - index.html
