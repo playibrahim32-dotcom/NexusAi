@@ -1,0 +1,1985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NexusAI — Intelligent Chat Assistant</title>
+<script>
+  (function () {
+    try {
+      if (localStorage.getItem('nexus_theme') === 'light') document.documentElement.classList.add('light');
+      var l = localStorage.getItem('nexus_lang');
+      if (l === 'ar' || l === 'fr' || l === 'en') {
+        document.documentElement.lang = l;
+        document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr';
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="icon" type="image/png" href="nexus-icon-square.png">
+<link rel="icon" type="image/svg+xml" href="nexus-icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics-compat.js"></script>
+<style>
+  body { font-family: 'Inter', 'Cairo', ui-sans-serif, system-ui, sans-serif; }
+  .app-h { height: 100vh; height: 100dvh; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(148,163,184,.15); border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,.3); }
+  @keyframes msgIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .msg { animation: msgIn .25s ease both; }
+  @keyframes modalIn { from { opacity: 0; transform: scale(.96) translateY(8px); } to { opacity: 1; transform: none; } }
+  .modal-card { animation: modalIn .18s ease both; }
+  @keyframes typingBounce { 0%, 80%, 100% { transform: translateY(0); opacity: .35; } 40% { transform: translateY(-4px); opacity: 1; } }
+  .dot { width: 6px; height: 6px; border-radius: 9999px; background: #94a3b8; animation: typingBounce 1.2s infinite; }
+  .dot:nth-child(2) { animation-delay: .15s; }
+  .dot:nth-child(3) { animation-delay: .3s; }
+  @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+  .stream-cursor { display: inline-block; width: 8px; height: 16px; margin-left: 2px; border-radius: 2px; background: linear-gradient(180deg, #a78bfa, #22d3ee); vertical-align: text-bottom; animation: blink 1s infinite; }
+  @keyframes pulseRing { 0% { box-shadow: 0 0 0 0 rgba(239,68,68,.45); } 70% { box-shadow: 0 0 0 10px rgba(239,68,68,0); } 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } }
+  .mic-live { animation: pulseRing 1.4s infinite; }
+  .input-base { background: rgba(14,20,36,.9); border: 1px solid rgba(255,255,255,.1); border-radius: 12px; padding: 0 12px; height: 44px; width: 100%; font-size: 14px; outline: none; color: #e2e8f0; transition: border-color .15s, box-shadow .15s; }
+  .input-base::placeholder { color: #475569; }
+  .input-base:focus { border-color: rgba(139,92,246,.6); box-shadow: 0 0 0 4px rgba(139,92,246,.1); }
+
+  /* ---- Settings rows / controls ---- */
+  .settings-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 14px; text-align: left; font-size: 13.5px; font-weight: 500; color: #e2e8f0; transition: background .15s; }
+  button.settings-row:hover { background: rgba(255,255,255,.04); }
+  .settings-row svg.chev { margin-left: auto; color: #64748b; flex-shrink: 0; }
+  .seg { display: flex; background: rgba(148,163,184,.15); border-radius: 999px; padding: 3px; flex-shrink: 0; }
+  .seg button { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #94a3b8; transition: all .18s; }
+  .seg button.seg-on { background: #ffffff; color: #0f172a; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+  .tg { width: 38px; height: 22px; border-radius: 999px; background: rgba(148,163,184,.25); position: relative; transition: background .2s; flex-shrink: 0; }
+  .tg.on { background: linear-gradient(90deg, #7c3aed, #d946ef); }
+  .tg-dot { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 999px; background: #ffffff; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+  .tg.on .tg-dot { transform: translateX(16px); }
+
+  /* ---- Light theme ---- */
+  html.light body { background: linear-gradient(160deg, #f8fafc 0%, #eef2f7 100%); color: #0f172a; }
+  html.light .bg-violet-600\/15 { background-color: rgba(124,58,237,.09) !important; }
+  html.light .bg-cyan-500\/10 { background-color: rgba(6,182,212,.08) !important; }
+  html.light #sidebar { background: #ffffff; border-color: rgba(15,23,42,.08); }
+  html.light header, html.light footer, html.light #modeBar { background: rgba(255,255,255,.85); border-color: rgba(15,23,42,.08); }
+  html.light .bg-\[\#111827\] { background-color: #ffffff !important; border-color: rgba(15,23,42,.1) !important; }
+  html.light .bg-\[\#111827\]\/95 { background-color: rgba(255,255,255,.95) !important; }
+  html.light .bg-\[\#121a2e\] { background-color: #ffffff !important; border-color: rgba(15,23,42,.12) !important; }
+  html.light .shadow-black\/30 { box-shadow: 0 10px 15px -3px rgba(15,23,42,.07) !important; }
+  html.light .shadow-black\/60 { box-shadow: 0 20px 25px -5px rgba(15,23,42,.15) !important; }
+  html.light .bg-white\/5 { background-color: rgba(15,23,42,.05) !important; }
+  html.light .bg-white\/10 { background-color: rgba(15,23,42,.07) !important; }
+  html.light .bg-white\/\[0\.03\] { background-color: rgba(15,23,42,.03) !important; }
+  html.light .border-white\/5 { border-color: rgba(15,23,42,.08) !important; }
+  html.light .border-white\/10 { border-color: rgba(15,23,42,.12) !important; }
+  html.light .hover\:bg-white\/5:hover { background-color: rgba(15,23,42,.05) !important; }
+  html.light .hover\:bg-white\/10:hover { background-color: rgba(15,23,42,.08) !important; }
+  html.light .hover\:text-white:hover { color: #0f172a !important; }
+  html.light .hover\:text-rose-300:hover { color: #be123c !important; }
+  html.light .text-slate-100 { color: #0f172a !important; }
+  html.light .text-slate-200 { color: #1e293b !important; }
+  html.light .text-slate-300 { color: #334155 !important; }
+  html.light .text-slate-400 { color: #475569 !important; }
+  html.light .text-slate-500 { color: #64748b !important; }
+  html.light .text-violet-300 { color: #7c3aed !important; }
+  html.light .text-rose-300 { color: #be123c !important; }
+  html.light .text-rose-400 { color: #be123c !important; }
+  html.light .text-amber-300 { color: #b45309 !important; }
+  html.light .text-sky-300 { color: #0369a1 !important; }
+  html.light .text-emerald-400 { color: #047857 !important; }
+  html.light .text-cyan-400 { color: #0891b2 !important; }
+  html.light .input-base { background: #ffffff; border-color: rgba(15,23,42,.15); color: #0f172a; }
+  html.light .input-base::placeholder { color: #94a3b8; }
+  html.light .settings-row { color: #1e293b; }
+  html.light button.settings-row:hover { background: rgba(15,23,42,.04); }
+  html.light .seg { background: rgba(15,23,42,.1); }
+  html.light .seg button { color: #64748b; }
+  html.light .seg button.seg-on { background: #0f172a; color: #ffffff; }
+  html.light .msg-body code, html.light .msg-body pre { background: rgba(15,23,42,.07) !important; color: #6d28d9 !important; }
+  html.light .msg-body pre { background: #f1f5f9 !important; color: #0f172a !important; border-color: rgba(15,23,42,.1) !important; }
+  html.light #toast { background: #0f172a; border-color: rgba(255,255,255,.12); color: #f1f5f9; }
+
+  /* ---- RTL ---- */
+  html[dir="rtl"] .ml-auto { margin-left: 0 !important; margin-right: auto !important; }
+  html[dir="rtl"] .mr-1 { margin-right: 0 !important; margin-left: .25rem !important; }
+  html[dir="rtl"] .text-right { text-align: left !important; }
+  html[dir="rtl"] #popover { left: auto !important; right: 0 !important; }
+  html[dir="rtl"] #sidebar { border-right-width: 0 !important; border-left-width: 1px !important; }
+  html[dir="rtl"] .rounded-tr-sm { border-top-right-radius: .375rem !important; border-top-left-radius: .125rem !important; }
+  html[dir="rtl"] .rounded-tl-sm { border-top-left-radius: .375rem !important; border-top-right-radius: .125rem !important; }
+  html[dir="rtl"] .settings-row { text-align: right; }
+  html[dir="rtl"] .settings-row svg.chev { margin-left: 0 !important; margin-right: auto !important; transform: scaleX(-1); }
+  html[dir="rtl"] button[data-close] { right: auto !important; left: .875rem !important; }
+  html[dir="rtl"] .pr-1 { padding-left: .25rem !important; }
+  html[dir="rtl"] .pl-3 { padding-left: .75rem !important; }
+  html[dir="rtl"] #settingsModal .px-5 > p { text-align: right; }
+  html[dir="rtl"] #authSetup ol { padding-left: 0 !important; padding-right: 1rem !important; }
+  html[dir="rtl"] .msg-body ul, html[dir="rtl"] .msg-body ol { padding-left: 0 !important; padding-right: 1.25rem !important; }
+  html[dir="rtl"] .msg-body blockquote { border-left-width: 0 !important; border-right: 2px solid rgba(139,92,246,.6) !important; padding-left: 0 !important; padding-right: .75rem !important; }
+  html[dir="rtl"] .stream-cursor { margin-left: 0 !important; margin-right: 2px !important; }
+  html[dir="rtl"] #previews .group > button { right: auto !important; left: -0.375rem !important; }
+  html[dir="rtl"] #authArea .absolute { right: auto !important; left: 0 !important; }
+  .seg.lang button { padding: 4px 9px; font-size: 11.5px; }
+</style>
+</head>
+<body class="app-h flex bg-slate-950 text-slate-100 overflow-hidden">
+
+  <div class="pointer-events-none fixed inset-0 z-0">
+    <div class="absolute -top-32 -left-32 w-[480px] h-[480px] rounded-full bg-violet-600/15 blur-3xl"></div>
+    <div class="absolute -bottom-40 -right-32 w-[520px] h-[520px] rounded-full bg-cyan-500/10 blur-3xl"></div>
+  </div>
+
+  <!-- ================= Sidebar ================= -->
+  <aside id="sidebar" class="relative z-20 shrink-0 overflow-hidden border-r border-white/5 bg-[#0b101d] transition-all duration-300 w-72">
+    <div class="w-72 h-full flex flex-col">
+      <div class="flex items-center gap-2.5 px-4 h-16 border-b border-white/5 shrink-0">
+        <img src="nexus-icon.svg" alt="NexusAI logo" class="w-9 h-9 rounded-lg object-cover ring-1 ring-white/10 shadow-lg shadow-fuchsia-900/40">
+        <div class="min-w-0 leading-tight">
+          <span class="text-[15px] font-bold tracking-tight block truncate">Nexus<span class="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">AI</span></span>
+          <span id="sidebarCredit" class="text-[10px] text-slate-500 tracking-wide block truncate">Created by Lassoued Ibrahim</span>
+        </div>
+        <button id="sidebarCloseBtn" title="Collapse sidebar" data-i18n-title="collapseSidebar" class="ml-auto w-8 h-8 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-200 transition flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+      </div>
+
+      <div class="p-3 shrink-0">
+        <button id="newChatBtn" class="w-full h-10 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:brightness-110 transition text-sm font-semibold flex items-center justify-center gap-2 shadow-lg shadow-fuchsia-900/40">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          <span data-i18n="newChat">New chat</span>
+        </button>
+      </div>
+
+      <div class="px-4 pb-2 pt-1 text-[10px] uppercase tracking-[0.18em] text-slate-600 font-semibold shrink-0" data-i18n="sidebar.history">Chat history</div>
+      <div id="chatListSidebar" class="flex-1 overflow-y-auto px-3 pb-3 space-y-1"></div>
+
+      <div class="p-3 border-t border-white/5 shrink-0 flex items-center gap-2">
+        <button id="sidebarSettingsBtn" title="Settings" data-i18n-title="settings" class="w-9 h-9 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-200 transition flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        <span class="text-[11px] text-slate-600">NexusAI v2.0</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ================= Main column ================= -->
+  <div class="relative z-10 flex-1 flex flex-col min-w-0">
+
+    <!-- Header -->
+    <header class="shrink-0 flex items-center gap-3 px-4 sm:px-6 h-16 border-b border-white/5 bg-slate-950/70 backdrop-blur-xl">
+      <button id="sidebarToggleBtn" title="Toggle sidebar" data-i18n-title="toggleSidebar" class="w-9 h-9 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-200 transition flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+      </button>
+      <img src="nexus-icon.svg" alt="NexusAI logo" class="hidden sm:block w-9 h-9 rounded-lg object-cover ring-1 ring-white/10 shadow-lg shadow-fuchsia-900/40">
+      <div class="min-w-0">
+        <h1 class="text-lg font-bold tracking-tight leading-none">Nexus<span class="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">AI</span></h1>
+        <p id="headerCredit" class="text-[11px] text-slate-500 tracking-wide hidden sm:block mt-0.5">Created by Lassoued Ibrahim</p>
+      </div>
+      <div class="ml-auto flex items-center gap-1.5">
+        <div class="hidden md:flex items-center gap-2 px-3 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium mr-1">
+          <span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span></span>
+          <span data-i18n="online">Online</span>
+        </div>
+        <button id="clearBtn" title="New chat" data-i18n-title="newChat" class="w-9 h-9 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-200 transition flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        </button>
+        <button id="settingsBtn" title="Settings" data-i18n-title="settings" class="w-9 h-9 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-200 transition flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-[18px] h-[18px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        <div id="authArea" class="relative"></div>
+      </div>
+    </header>
+
+    <!-- Mode switcher -->
+    <nav id="modeBar" class="shrink-0 flex items-center gap-1.5 px-4 sm:px-6 h-12 border-b border-white/5 bg-slate-950/60 backdrop-blur-xl overflow-x-auto no-scrollbar"></nav>
+
+    <!-- Chat area -->
+    <main id="chatScroll" class="flex-1 overflow-y-auto">
+      <div class="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+
+        <div id="emptyState" class="flex flex-col items-center text-center pt-8 pb-6">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-600/30 to-cyan-500/20 border border-white/10 flex items-center justify-center mb-4 shadow-xl shadow-violet-950/50">
+            <svg viewBox="0 0 24 24" class="w-8 h-8" fill="url(#lg)"><defs><linearGradient id="lg" x1="0" y1="0" x2="24" y2="24"><stop stop-color="#a78bfa"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs><path d="M12 2l2.4 6.2L21 10l-6.6 1.8L12 18l-2.4-6.2L3 10l6.6-1.8L12 2z"/></svg>
+          </div>
+          <h2 class="text-xl font-bold" data-i18n="empty.ask">How can I help you today?</h2>
+          <p id="emptyTagline" class="text-sm text-slate-400 mt-1 mb-5"></p>
+          <div id="suggestions" class="flex flex-wrap justify-center gap-2 max-w-xl"></div>
+        </div>
+
+        <div id="chatList" class="space-y-5"></div>
+      </div>
+    </main>
+
+    <!-- Input area -->
+    <footer class="shrink-0 border-t border-white/5 bg-slate-950/70 backdrop-blur-xl">
+      <div class="max-w-3xl mx-auto px-4 sm:px-6 pt-3 pb-2">
+
+        <div id="previews" class="hidden flex-wrap gap-2 mb-2"></div>
+
+        <div class="bg-[#0e1424]/90 border border-white/10 rounded-2xl p-1.5 flex items-end gap-1 shadow-2xl shadow-black/50 focus-within:border-violet-500/60 focus-within:ring-4 focus-within:ring-violet-500/10 transition">
+
+          <div class="relative">
+            <button id="plusBtn" title="Add files or tools" data-i18n-title="attach" class="w-10 h-10 rounded-xl hover:bg-white/5 text-slate-400 hover:text-white transition flex items-center justify-center shrink-0">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            </button>
+            <div id="popover" class="hidden absolute bottom-12 left-0 w-64 bg-[#121a2e] border border-white/10 rounded-xl shadow-2xl shadow-black/60 p-1.5 z-30">
+              <button id="uploadBtn" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition text-left">
+                <span class="w-8 h-8 rounded-lg bg-violet-500/15 text-violet-400 flex items-center justify-center shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                </span>
+                <span><span class="block text-sm font-medium" data-i18n="pop.upload">Upload file</span><span class="block text-[11px] text-slate-500" data-i18n="pop.uploadDesc">Images, PDFs, documents</span></span>
+              </button>
+              <button id="clearPopBtn" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition text-left">
+                <span class="w-8 h-8 rounded-lg bg-rose-500/15 text-rose-400 flex items-center justify-center shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                </span>
+                <span class="block text-sm font-medium" data-i18n="newChat">New chat</span>
+              </button>
+            </div>
+          </div>
+
+          <textarea id="input" rows="1" placeholder="Message NexusAI…" data-i18n-ph="input.placeholder" dir="auto"
+            class="flex-1 bg-transparent outline-none resize-none text-[15px] leading-6 py-2 px-1.5 max-h-40 placeholder:text-slate-600 min-h-[40px]"></textarea>
+
+          <button id="langBtn" title="Voice & input language" data-i18n-title="voiceLang" class="h-8 px-2 rounded-lg border border-white/10 text-[11px] font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition shrink-0">EN</button>
+
+          <button id="micBtn" title="Voice input" data-i18n-title="voiceInput" class="w-10 h-10 rounded-xl hover:bg-white/5 text-slate-400 hover:text-white transition flex items-center justify-center shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+          </button>
+
+          <button id="sendBtn" disabled title="Send" data-i18n-title="send" class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white flex items-center justify-center shrink-0 transition shadow-lg shadow-fuchsia-900/40 hover:brightness-110 disabled:opacity-30 disabled:shadow-none disabled:cursor-not-allowed">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-5 h-5 -ml-0.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+          </button>
+        </div>
+
+        <p id="footerLine" class="text-center text-[11px] text-slate-600 py-2">Powered by OpenRouter · nvidia/nemotron-3.5-lightning:free · Enter ↵ to send · Shift+Enter for a new line</p>
+      </div>
+    </footer>
+  </div>
+
+  <input type="file" id="fileInput" multiple accept="image/*,.pdf,.txt,.md,.doc,.docx,.csv,.json,.zip" class="hidden">
+
+  <!-- ================= Auth modal ================= -->
+  <div id="authModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" data-close="auth"></div>
+    <div class="relative w-full max-w-sm bg-[#111827] border border-white/10 rounded-2xl shadow-2xl p-6 modal-card">
+      <button class="absolute top-3.5 right-3.5 w-8 h-8 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-200 transition flex items-center justify-center" data-close="auth">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+      <h2 class="text-lg font-bold mb-1" data-i18n="auth.title">Welcome to NexusAI</h2>
+      <p class="text-[12.5px] text-slate-500 mb-5" data-i18n="auth.subtitle">Sign in to sync your experience and access your account.</p>
+
+      <div id="authSetup" class="hidden">
+        <div class="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3.5 mb-4">
+          <p class="text-amber-300 text-[13px] font-semibold mb-1.5" data-i18n="auth.setupTitle">Firebase is not configured yet</p>
+          <ol class="text-[12px] text-slate-400 list-decimal pl-4 space-y-1 leading-5">
+            <li data-i18n-html="auth.setup1">Create a project at <span class="text-slate-300">console.firebase.google.com</span></li>
+            <li data-i18n-html="auth.setup2">Enable <span class="text-slate-300">Authentication → Google + Email/Password</span></li>
+            <li data-i18n-html="auth.setup3">Copy your web config into <span class="text-slate-300">FIREBASE_CONFIG</span> in index.html</li>
+          </ol>
+        </div>
+        <p class="text-[12px] text-slate-500 leading-5" data-i18n-html="auth.setupNote">Google sign-in also requires serving this page from <span class="text-slate-400">http://localhost</span> or a domain you add to Firebase's authorized domains.</p>
+      </div>
+
+      <div id="authFileNotice" class="hidden">
+        <div class="rounded-xl bg-sky-500/10 border border-sky-500/20 p-3.5 mb-4">
+          <p class="text-sky-300 text-[13px] font-semibold mb-1" data-i18n="auth.fileTitle">Local file mode</p>
+          <p class="text-[12px] text-slate-400 leading-5" data-i18n-html="auth.fileNote">You're opening NexusAI as a local file, so Google sign-in is unavailable here. Email/password sign-in still works — or serve this folder from <span class="text-slate-300">http://localhost</span> for full sign-in. You can close this window and keep chatting without signing in.</p>
+        </div>
+      </div>
+
+      <div id="authForms">
+        <div class="flex rounded-xl bg-white/5 p-1 mb-4">
+          <button id="tabSignIn" class="flex-1 h-9 rounded-lg text-sm font-semibold bg-violet-600 text-white transition" data-i18n="auth.signin">Sign in</button>
+          <button id="tabSignUp" class="flex-1 h-9 rounded-lg text-sm font-semibold text-slate-400 hover:text-white transition" data-i18n="auth.signup">Create account</button>
+        </div>
+
+        <button id="googleBtn" class="w-full h-11 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition text-sm font-semibold flex items-center justify-center gap-2.5 mb-3">
+          <svg viewBox="0 0 24 24" class="w-4.5 h-4.5 w-[18px] h-[18px]"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          <span data-i18n="auth.google">Continue with Google</span>
+        </button>
+
+        <div class="flex items-center gap-3 my-4">
+          <div class="h-px flex-1 bg-white/10"></div>
+          <span class="text-[11px] text-slate-600 uppercase tracking-widest" data-i18n="auth.or">or</span>
+          <div class="h-px flex-1 bg-white/10"></div>
+        </div>
+
+        <form id="authForm" class="space-y-3">
+          <input id="authName" type="text" placeholder="Display name (optional)" data-i18n-ph="auth.name" class="hidden input-base">
+          <input id="authEmail" type="email" placeholder="Email address" data-i18n-ph="auth.email" required class="input-base">
+          <input id="authPassword" type="password" placeholder="Password (min 6 characters)" data-i18n-ph="auth.password" required minlength="6" class="input-base">
+          <p id="authError" class="hidden text-rose-400 text-[12.5px] leading-5"></p>
+          <button id="authSubmit" type="submit" class="w-full h-11 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:brightness-110 transition text-sm font-semibold shadow-lg shadow-fuchsia-900/40">Sign in</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= Settings modal ================= -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" data-close="settings"></div>
+    <div class="relative w-full max-w-md bg-[#111827] border border-white/10 rounded-2xl shadow-2xl p-0 modal-card max-h-[90vh] overflow-y-auto">
+      <div class="sticky top-0 z-10 bg-[#111827]/95 backdrop-blur border-b border-white/5 px-5 py-4 flex items-center justify-between">
+        <h2 class="text-[17px] font-bold" data-i18n="set.title">Paramètres</h2>
+        <button class="w-8 h-8 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-200 transition flex items-center justify-center" data-close="settings">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Compte -->
+      <div class="px-5 pt-4">
+        <p class="text-[11px] uppercase tracking-[0.16em] text-slate-500 font-semibold mb-1.5" data-i18n="set.account">Compte</p>
+        <div class="rounded-xl border border-white/10 divide-y divide-white/5 overflow-hidden">
+          <button data-info-i18n="info.usage" class="settings-row">
+            <span class="text-slate-400 shrink-0">⚡</span> <span data-i18n="set.usage">Limites d'utilisation</span>
+            <span class="ml-auto text-slate-500 text-[12px] font-normal" data-i18n="set.free">Gratuit</span>
+          </button>
+          <button data-info-i18n="info.upgrade" class="settings-row">
+            <span class="shrink-0">✨</span>
+            <span class="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent font-semibold" data-i18n="set.upgrade">Passez à NexusAI Plus</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Préférences -->
+      <div class="px-5 pt-5">
+        <p class="text-[11px] uppercase tracking-[0.16em] text-slate-500 font-semibold mb-1.5" data-i18n="set.prefs">Préférences</p>
+        <div class="rounded-xl border border-white/10 divide-y divide-white/5 overflow-hidden">
+          <div class="settings-row">
+            <span class="text-slate-400 shrink-0">🧠</span> <span data-i18n="set.personalized">Intelligence personnalisée</span>
+            <button id="personalizeToggle" class="tg ml-auto" role="switch" aria-checked="false"><span class="tg-dot"></span></button>
+          </div>
+          <button data-info-i18n="info.skills" class="settings-row">
+            <span class="text-slate-400 shrink-0">🛠️</span> <span data-i18n="set.skills">Compétences</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="chev w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <button data-info-i18n="info.gems" class="settings-row">
+            <span class="text-slate-400 shrink-0">💎</span> <span data-i18n="set.gems">Gems</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="chev w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <div class="settings-row">
+            <span class="text-slate-400 shrink-0">🎨</span> <span data-i18n="set.theme">Thème</span>
+            <div class="seg ml-auto">
+              <button id="themeDark" class="seg-on" data-i18n="set.dark">Sombre</button>
+              <button id="themeLight" data-i18n="set.light">Clair</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <span class="text-slate-400 shrink-0">🌐</span> <span data-i18n="set.lang">Langue</span>
+            <div class="seg lang ml-auto">
+              <button id="langAr">العربية</button>
+              <button id="langFr">Français</button>
+              <button id="langEn">English</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <span class="text-slate-400 shrink-0">🔖</span> <span data-i18n="set.watermark">Filigrane مطور</span>
+            <button id="watermarkToggle" class="tg ml-auto" role="switch" aria-checked="true"><span class="tg-dot"></span></button>
+          </div>
+          <div class="settings-row">
+            <span class="text-slate-400 shrink-0">🎤</span> <span data-i18n="set.sttLang">Langue de la saisie vocale</span>
+            <select id="sttLangSelect" class="ml-auto bg-transparent text-[12.5px] text-slate-400 outline-none cursor-pointer border border-white/10 rounded-lg px-2 py-1">
+              <option value="en-US" class="bg-[#111827]" data-i18n="set.sttEn">English</option>
+              <option value="ar-SA" class="bg-[#111827]" data-i18n="set.sttAr">العربية (Arabic)</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <span class="text-slate-400 shrink-0">🔊</span> <span data-i18n="set.ttsSpeed">Vitesse de lecture</span>
+            <select id="ttsRateSelect" class="ml-auto bg-transparent text-[12.5px] text-slate-400 outline-none cursor-pointer border border-white/10 rounded-lg px-2 py-1">
+              <option value="0.8" class="bg-[#111827]" data-i18n="set.ttsSlow">Lent (0.8×)</option>
+              <option value="1" class="bg-[#111827]" data-i18n="set.ttsNormal">Normal (1×)</option>
+              <option value="1.2" class="bg-[#111827]" data-i18n="set.ttsFast">Rapide (1.2×)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Données et confidentialité -->
+      <div class="px-5 pt-5 pb-5">
+        <p class="text-[11px] uppercase tracking-[0.16em] text-slate-500 font-semibold mb-1.5" data-i18n="set.data">Données et confidentialité</p>
+        <div class="rounded-xl border border-white/10 divide-y divide-white/5 overflow-hidden">
+          <button data-info-i18n="info.publicLinks" class="settings-row">
+            <span class="text-slate-400 shrink-0">🔗</span> <span data-i18n="set.publicLinks">Vos liens publics</span>
+            <span class="ml-auto text-slate-500 text-[12px] font-normal" data-i18n="set.none">Aucun</span>
+          </button>
+          <button data-info-i18n="info.feedback" class="settings-row">
+            <span class="text-slate-400 shrink-0">💬</span> <span data-i18n="set.feedback">Envoyer des commentaires</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="chev w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <button data-info-i18n="info.help" class="settings-row">
+            <span class="text-slate-400 shrink-0">❓</span> <span data-i18n="set.help">Aide</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="chev w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <a href="mailto:lassouedibrahim14@gmail.com" class="settings-row" target="_blank" rel="noopener noreferrer">
+            <span class="text-slate-400 shrink-0">📧</span>
+            <span class="text-[12.5px] text-slate-400 leading-5" dir="auto">للتواصل يرجى الإرسال عبر: <span class="text-violet-300 font-semibold">lassouedibrahim14@gmail.com</span></span>
+          </a>
+          <button data-info-i18n="info.location" class="settings-row">
+            <span class="text-slate-400 shrink-0">📍</span> <span data-i18n="set.location">Lieu</span>
+            <span class="ml-auto text-slate-500 text-[12px] font-normal" data-i18n="set.undefined">Non défini</span>
+          </button>
+          <button data-info-i18n="info.activity" class="settings-row">
+            <span class="text-slate-400 shrink-0">🕘</span> <span data-i18n="set.activity">Activité</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="chev w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+        </div>
+
+        <button id="clearChatsBtn" class="mt-4 w-full h-10 rounded-xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 transition text-[13px] font-semibold" data-i18n="set.deleteChats">Supprimer toutes les discussions</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="fixed top-20 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-full bg-slate-800 border border-white/10 text-sm shadow-xl opacity-0 pointer-events-none transition-opacity duration-300"></div>
+
+<script>
+/* ================= Firebase configuration ================= */
+const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyD0FFa3j49Ll--IUvuxe9G7LhpWbS1ha2U',
+  authDomain: 'nexusai-ff299.firebaseapp.com',
+  projectId: 'nexusai-ff299',
+  storageBucket: 'nexusai-ff299.firebasestorage.app',
+  messagingSenderId: '358474953300',
+  appId: '1:358474953300:web:c1ef13d9dba038bf81f3c1',
+  measurementId: 'G-RZQN1CYCGE'
+};
+const firebaseConfigured = !/YOUR_/.test(FIREBASE_CONFIG.apiKey);
+
+/* ================= OpenRouter API configuration ================= */
+const OR_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+const OR_MODEL = 'nvidia/nemotron-3.5-lightning:free';
+const OR_API_KEY = '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';
+const OR_HEADERS = {
+  'Authorization': 'Bearer ' + OR_API_KEY,
+  'HTTP-Referer': 'https://nexusai.local',
+  'X-Title': 'NexusAI',
+  'Content-Type': 'application/json'
+};
+
+const ICONS = {
+  sparkles: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="IC" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z"/></svg>',
+  zap: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="IC" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
+  wrench: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="IC" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+  bulb: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="IC" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5.76.76 1.23 1.52 1.41 2.5"/></svg>',
+  pen: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="IC" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  speak: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="IC" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></svg>',
+  stop: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="IC"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>',
+  copy: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="IC" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>',
+  check: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="IC" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  refresh: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="IC" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>',
+  file: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="IC" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
+  image: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="IC" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>',
+  message: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="IC" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+  trash: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="IC" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>',
+  x: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="IC" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>'
+};
+const icon = (name, cls) => ICONS[name].replace('IC', cls || 'w-4 h-4');
+
+const MODES = [
+  {
+    id: 'general', label: 'General', icon: 'sparkles',
+    labels: { en: 'General', fr: 'Général', ar: 'عام' },
+    tagline: 'All-around assistant for everyday questions and tasks.',
+    taglines: {
+      en: 'All-around assistant for everyday questions and tasks.',
+      fr: 'Assistant polyvalent pour les questions et tâches du quotidien.',
+      ar: 'مساعد شامل للأسئلة والمهام اليومية.'
+    },
+    welcome: {
+      en: "Hi! I'm **NexusAI** — your all-around assistant, powered by OpenRouter. Ask me anything, from quick facts to detailed guidance.",
+      fr: "Bonjour ! Je suis **NexusAI** — votre assistant polyvalent, propulsé par OpenRouter. Posez-moi n'importe quelle question, des faits rapides aux conseils détaillés.",
+      ar: "أهلاً بك! أنا **NexusAI** — مساعدك الذكي الشامل المدعوم بـ OpenRouter. اسألني عن أي شيء، من المعلومة السريعة إلى المساعدة التفصيلية."
+    },
+    suggestions: {
+      en: ['What is machine learning?', 'Summarize a long article for me', 'Plan a productive morning routine'],
+      fr: ["Qu'est-ce que le machine learning ?", 'Résumez-moi un long article', 'Planifiez une routine matinale productive'],
+      ar: ['ما هو تعلّم الآلة؟', 'لخّص لي مقالاً طويلاً', 'ضع لي روتيناً صباحياً منتجاً']
+    },
+    prompt: "You are NexusAI, a professional, friendly all-around assistant embedded in the NexusAI chat app. Answer questions clearly and accurately. Use clean Markdown (headings, bold, bullet lists, code blocks) whenever it improves readability, and keep replies concise. Always reply in the same language the user writes in (Arabic or English)."
+  },
+  {
+    id: 'quick', label: 'Quick Q&A', icon: 'zap',
+    labels: { en: 'Quick Q&A', fr: 'Q&R rapide', ar: 'سؤال وجواب سريع' },
+    tagline: 'Fast, direct answers. Try a math expression like 15% of 240.',
+    taglines: {
+      en: 'Fast, direct answers. Try a math expression like 15% of 240.',
+      fr: 'Réponses rapides et directes. Essayez un calcul comme 15 % de 240.',
+      ar: 'إجابات سريعة ومباشرة. جرّب عملية حسابية مثل 15% من 240.'
+    },
+    welcome: {
+      en: "**Quick Q&A mode** is on — fast, straight-to-the-point answers. Try a calculation like `45 × 12`, or ask any short question.",
+      fr: "Le **mode Q&R rapide** est activé — des réponses rapides et directes. Essayez un calcul comme `45 × 12`, ou posez une question courte.",
+      ar: "تم تفعيل **وضع الإجابات السريعة** — أجوبة مباشرة ومختصرة. جرّب عملية حسابية مثل ٤٥ × ١٢، أو اطرح أي سؤال قصير."
+    },
+    suggestions: {
+      en: ['What is 15% of 240?', 'Calculate 128 * 4 + 20', 'What does API stand for?'],
+      fr: ['Combien font 15 % de 240 ?', 'Calcule 128 × 4 + 20', "Que signifie l'acronyme API ?"],
+      ar: ['كم يساوي 15% من 240؟', 'احسب 128 × 4 + 20', 'ما معنى API؟']
+    },
+    prompt: "You are NexusAI in 'Quick Q&A' mode. Give fast, direct, minimal answers: 1-4 sentences or short bullet lists. For math or calculations, compute the exact result and show a brief working. No long introductions — answer the question immediately. Always reply in the same language the user writes in (Arabic or English)."
+  },
+  {
+    id: 'solver', label: 'Problem Solver', icon: 'wrench',
+    labels: { en: 'Problem Solver', fr: 'Résolution de problèmes', ar: 'حل المشكلات' },
+    tagline: 'Step-by-step reasoning for bugs, blockers and tricky problems.',
+    taglines: {
+      en: 'Step-by-step reasoning for bugs, blockers and tricky problems.',
+      fr: 'Raisonnement pas à pas pour bugs, blocages et problèmes complexes.',
+      ar: 'تفكير خطوة بخطوة للأخطاء والعوائق والمشاكل الصعبة.'
+    },
+    welcome: {
+      en: "**Problem Solver mode** is on — describe your problem and I'll walk you through it step by step.",
+      fr: "Le **mode Résolution de problèmes** est activé — décrivez votre problème et je vous guiderai étape par étape.",
+      ar: "تم تفعيل **وضع حل المشكلات** — صِف لي مشكلتك وسأقودك خطوة بخطوة نحو الحل."
+    },
+    suggestions: {
+      en: ['My code throws a null pointer error', "I can't focus while studying", 'How do I debug a slow website?'],
+      fr: ['Mon code renvoie une erreur de pointeur nul', "Je n'arrive pas à me concentrer en étudiant", 'Comment déboguer un site lent ?'],
+      ar: ['الكود يعطيني خطأ غير متوقع', 'لا أستطيع التركيز أثناء الدراسة', 'كيف أصلح موقعاً بطيئاً؟']
+    },
+    prompt: "You are NexusAI in 'Problem Solver' mode. Act as a methodical technical consultant. Structure every answer as: 1) a short restatement of the problem, 2) a numbered step-by-step plan with clear, actionable steps, 3) optional warnings about common pitfalls. If the problem is vague, briefly ask one clarifying question but still provide a provisional plan. Use Markdown numbered lists and bold step titles. Always reply in the same language the user writes in (Arabic or English)."
+  },
+  {
+    id: 'forge', label: 'Idea Forge', icon: 'bulb',
+    labels: { en: 'Idea Forge', fr: 'Forge à idées', ar: 'مختبر الأفكار' },
+    tagline: 'Creative brainstorming — ideas, angles and possibilities on demand.',
+    taglines: {
+      en: 'Creative brainstorming — ideas, angles and possibilities on demand.',
+      fr: 'Brainstorming créatif — idées, angles et possibilités à la demande.',
+      ar: 'عصف ذهني إبداعي — أفكار وزوايا وإمكانيات عند الطلب.'
+    },
+    welcome: {
+      en: "Welcome to **Idea Forge** — tell me a topic or field and I'll generate creative ideas around it.",
+      fr: "Bienvenue dans la **Forge à idées** — dites-moi un sujet ou un domaine et je générerai des idées créatives.",
+      ar: "أهلاً بك في **مختبر الأفكار** — أخبرني عن مجالك أو موضوعك وسأولّد لك أفكاراً مبتكرة."
+    },
+    suggestions: {
+      en: ['Startup ideas for students', 'Content ideas for a tech blog', 'App ideas to build this weekend'],
+      fr: ['Des idées de startup pour étudiants', 'Des idées de contenu pour un blog tech', "Des idées d'apps à créer ce week-end"],
+      ar: ['أفكار مشاريع ناشئة للطلاب', 'أفكار محتوى لمدونة تقنية', 'أفكار تطبيقات يمكن بناؤها سريعاً']
+    },
+    prompt: "You are NexusAI in 'Idea Forge' mode. You are a creative brainstorming partner. Generate 4-6 concrete, original, actionable ideas as a Markdown bullet list, each starting with a bold title and a one-line description, optionally with an emoji. Tailor ideas to the user's topic or field, and end with one follow-up question offering to develop any idea further. Always reply in the same language the user writes in (Arabic or English)."
+  },
+  {
+    id: 'studio', label: 'Writing Studio', icon: 'pen',
+    labels: { en: 'Writing Studio', fr: "Studio d'écriture", ar: 'استوديو الكتابة' },
+    tagline: 'Drafts, rewrites and outlines — polished text in seconds.',
+    taglines: {
+      en: 'Drafts, rewrites and outlines — polished text in seconds.',
+      fr: 'Brouillons, réécritures et plans — un texte soigné en quelques secondes.',
+      ar: 'مسودات وإعادة صياغة ومخططات — نص متقن في ثوانٍ.'
+    },
+    welcome: {
+      en: "**Writing Studio mode** is on — paste text to improve it, or ask me to write, draft or outline anything.",
+      fr: "Le **mode Studio d'écriture** est activé — collez un texte à améliorer, ou demandez-moi d'écrire, de rédiger ou de structurer quoi que ce soit.",
+      ar: "تم تفعيل **وضع استوديو الكتابة** — الصق نصاً لتحسينه، أو اطلب مني كتابة أو صياغة أو تخطيط أي محتوى."
+    },
+    suggestions: {
+      en: ['Write a professional email asking for a meeting', 'Rewrite this: "I need the report asap pls"', 'Outline a blog post about productivity'],
+      fr: ['Écrivez un e-mail professionnel pour demander un rendez-vous', 'Réécrivez : « J\'ai besoin du rapport au plus vite svp »', 'Structurez un article de blog sur la productivité'],
+      ar: ['اكتب بريداً رسمياً لطلب اجتماع', 'حسّن هذه الجملة: "أريد التقرير بسرعة"', 'ضع مخططاً لمقال عن الإنتاجية']
+    },
+    prompt: "You are NexusAI in 'Writing Studio' mode. You are a professional writing assistant. If the user pastes text to improve, return the polished version plus a short bullet list of the changes made. If they ask for a draft, produce a well-structured draft in Markdown. If they ask for an outline, produce a structured outline. Adapt the tone to the request (formal, friendly, marketing) and mention which tone you used. Always reply in the same language the user writes in (Arabic or English)."
+  }
+];
+
+const $ = s => document.querySelector(s);
+const sidebar = $('#sidebar'), modeBar = $('#modeBar'), chatList = $('#chatList'), chatScroll = $('#chatScroll'),
+      emptyState = $('#emptyState'), emptyTagline = $('#emptyTagline'), suggestions = $('#suggestions'),
+      input = $('#input'), sendBtn = $('#sendBtn'), micBtn = $('#micBtn'), langBtn = $('#langBtn'),
+      plusBtn = $('#plusBtn'), popover = $('#popover'), fileInput = $('#fileInput'),
+      previews = $('#previews'), toastEl = $('#toast'), authArea = $('#authArea');
+
+let currentMode = MODES[0];
+let pendingFiles = [];
+let chats = [];
+let activeChatId = null;
+let chatEpoch = 0;
+let busy = false;
+let activeAbort = null;
+let streamShell = null;
+let speakingBtn = null;
+let rec = null, listening = false, sttLang = 'en-US';
+let toastTimer = null;
+let auth = null;
+
+/* ---------- Internationalization (i18n) ---------- */
+let curLang = (function () {
+  try {
+    const l = localStorage.getItem('nexus_lang');
+    return (l === 'ar' || l === 'fr' || l === 'en') ? l : 'en';
+  } catch (e) { return 'en'; }
+})();
+
+const I18N = {
+  en: {
+    'app.title': 'NexusAI — AI Chat Assistant',
+    'online': 'Online',
+    'newChat': 'New chat',
+    'deleteChat': 'Delete chat',
+    'settings': 'Settings',
+    'toggleSidebar': 'Toggle sidebar',
+    'collapseSidebar': 'Collapse sidebar',
+    'sidebar.history': 'Chat history',
+    'sidebar.empty': 'No conversations yet.<br>Start a new chat!',
+    'empty.ask': 'How can I help you today?',
+    'pop.upload': 'Upload file',
+    'pop.uploadDesc': 'Images, PDFs, documents',
+    'attach': 'Add files or tools',
+    'input.placeholder': 'Message NexusAI…',
+    'voiceLang': 'Voice & input language',
+    'voiceInput': 'Voice input',
+    'send': 'Send',
+    'footer.powered': 'Powered by OpenRouter · {model} · Enter ↵ to send · Shift+Enter for a new line',
+    'auth.title': 'Welcome to NexusAI',
+    'auth.subtitle': 'Sign in to sync your experience and access your account.',
+    'auth.setupTitle': 'Firebase is not configured yet',
+    'auth.setup1': 'Create a project at <span class="text-slate-300">console.firebase.google.com</span>',
+    'auth.setup2': 'Enable <span class="text-slate-300">Authentication → Google + Email/Password</span>',
+    'auth.setup3': 'Copy your web config into <span class="text-slate-300">FIREBASE_CONFIG</span> in index.html',
+    'auth.setupNote': 'Google sign-in also requires serving this page from <span class="text-slate-400">http://localhost</span> or a domain you add to Firebase\'s authorized domains.',
+    'auth.fileTitle': 'Local file mode',
+    'auth.fileNote': 'You\'re opening NexusAI as a local file, so Google sign-in is unavailable here. Email/password sign-in still works — or serve this folder from <span class="text-slate-300">http://localhost</span> for full sign-in. You can close this window and keep chatting without signing in.',
+    'auth.signin': 'Sign in',
+    'auth.signup': 'Create account',
+    'auth.google': 'Continue with Google',
+    'auth.or': 'or',
+    'auth.name': 'Display name (optional)',
+    'auth.email': 'Email address',
+    'auth.password': 'Password (min 6 characters)',
+    'auth.signout': 'Sign out',
+    'auth.account': 'Account',
+    'auth.user': 'User',
+    'set.title': 'Settings',
+    'set.account': 'Account',
+    'set.prefs': 'Preferences',
+    'set.data': 'Data & privacy',
+    'set.usage': 'Usage limits',
+    'set.free': 'Free',
+    'set.upgrade': 'Upgrade to NexusAI Plus',
+    'set.personalized': 'Personalized intelligence',
+    'set.skills': 'Skills',
+    'set.gems': 'Gems',
+    'set.theme': 'Theme',
+    'set.dark': 'Dark',
+    'set.light': 'Light',
+    'set.watermark': 'Developer watermark',
+    'set.lang': 'Language',
+    'set.sttLang': 'Voice input language',
+    'set.sttEn': 'English',
+    'set.sttAr': 'Arabic',
+    'set.ttsSpeed': 'Read-aloud speed',
+    'set.ttsSlow': 'Slow (0.8×)',
+    'set.ttsNormal': 'Normal (1×)',
+    'set.ttsFast': 'Fast (1.2×)',
+    'set.publicLinks': 'Your public links',
+    'set.none': 'None',
+    'set.feedback': 'Send feedback',
+    'set.help': 'Help',
+    'set.location': 'Location',
+    'set.undefined': 'Not set',
+    'set.activity': 'Activity',
+    'set.deleteChats': 'Delete all chats',
+    'info.usage': 'Free plan — unlimited replies with the current free model.',
+    'info.upgrade': 'NexusAI Plus is coming soon — stay tuned!',
+    'info.skills': 'Skills — coming soon.',
+    'info.gems': 'Gems — coming soon.',
+    'info.publicLinks': 'No public links yet.',
+    'info.feedback': 'Thanks! Send your feedback to contact@nexusai.local',
+    'info.help': 'Help: serve the app via http://localhost to enable all features.',
+    'info.location': 'Location: not set.',
+    'info.activity': 'Activity: detailed history is coming soon.',
+    'toast.themeLight': 'Light theme enabled',
+    'toast.themeDark': 'Dark theme enabled',
+    'toast.watermarkOn': 'Watermark shown',
+    'toast.watermarkOff': 'Watermark hidden',
+    'toast.personalizedOn': 'Personalized intelligence enabled',
+    'toast.personalizedOff': 'Personalized intelligence disabled',
+    'toast.tts': 'Read-aloud speed updated',
+    'toast.chatsDeleted': 'All chats have been deleted',
+    'toast.lang': 'Language updated',
+    'toast.copied': 'Copied',
+    'toast.copyFail': 'Could not copy',
+    'toast.signedInGoogle': 'Signed in with Google',
+    'toast.signedIn': 'Signed in',
+    'toast.accountCreated': 'Account created — welcome!',
+    'toast.signedOut': 'Signed out',
+    'toast.maxFiles': 'Max 5 files at a time',
+    'toast.ttsUnsupported': 'Text-to-speech is not supported in this browser',
+    'toast.sttUnsupported': 'Voice input is not supported in this browser — try Chrome or Edge',
+    'toast.micDenied': 'Microphone access was denied',
+    'toast.micError': 'Voice input error: {e}',
+    'toast.micStartFail': 'Could not start voice input',
+    'asst.read': 'Read aloud',
+    'asst.copy': 'Copy response',
+    'asst.retry': 'Retry',
+    'err.hint': 'Check your internet connection, then try again.',
+    'err.empty': 'The model returned an empty response.',
+    'err.cancelled': 'Request cancelled.',
+    'err.http': 'OpenRouter request failed (HTTP {status})',
+    'authErr.default': 'Authentication failed',
+    'authErr.env': 'Google sign-in is not supported when the app runs from a local file. Serve NexusAI from http://localhost (or an authorized domain) to use Google sign-in — email/password still works here, and you can keep chatting without an account.',
+    'authErr.config': 'Authentication is not enabled for this Firebase project. Open the Firebase console → Authentication → Sign-in method and enable Email/Password (and Google for web domains).',
+    'authErr.apiKey': 'The Firebase API key is invalid or restricted. Check the key in your Firebase project settings and add this origin to the allowed referrers.',
+    'authErr.domain': 'This domain is not authorized for Firebase Authentication. Add it under Authentication → Settings → Authorized domains.',
+    'authErr.network': 'Network error — check your internet connection and try again.',
+    'authErr.notConfigured': 'Firebase is not configured — see the setup steps above.',
+    'rel.now': 'now',
+    'rel.minAgo': '{m}m ago',
+    'rel.hourAgo': '{h}h ago',
+    'modes.general': 'General'
+  },
+  fr: {
+    'app.title': 'NexusAI — Assistant de chat IA',
+    'online': 'En ligne',
+    'newChat': 'Nouvelle discussion',
+    'deleteChat': 'Supprimer la discussion',
+    'settings': 'Paramètres',
+    'toggleSidebar': 'Afficher/masquer la barre latérale',
+    'collapseSidebar': 'Réduire la barre latérale',
+    'sidebar.history': 'Historique des discussions',
+    'sidebar.empty': 'Aucune discussion pour l\'instant.<br>Lancez une nouvelle discussion !',
+    'empty.ask': 'Comment puis-je vous aider aujourd\'hui ?',
+    'pop.upload': 'Importer un fichier',
+    'pop.uploadDesc': 'Images, PDF, documents',
+    'attach': 'Ajouter des fichiers ou des outils',
+    'input.placeholder': 'Écrivez à NexusAI…',
+    'voiceLang': 'Langue vocale et de saisie',
+    'voiceInput': 'Saisie vocale',
+    'send': 'Envoyer',
+    'footer.powered': 'Propulsé par OpenRouter · {model} · Entrée ↵ pour envoyer · Maj+Entrée pour une nouvelle ligne',
+    'auth.title': 'Bienvenue sur NexusAI',
+    'auth.subtitle': 'Connectez-vous pour synchroniser votre expérience et accéder à votre compte.',
+    'auth.setupTitle': 'Firebase n\'est pas encore configuré',
+    'auth.setup1': 'Créez un projet sur <span class="text-slate-300">console.firebase.google.com</span>',
+    'auth.setup2': 'Activez <span class="text-slate-300">Authentication → Google + E-mail/Mot de passe</span>',
+    'auth.setup3': 'Copiez votre configuration web dans <span class="text-slate-300">FIREBASE_CONFIG</span> (index.html)',
+    'auth.setupNote': 'La connexion Google nécessite aussi de servir cette page depuis <span class="text-slate-400">http://localhost</span> ou un domaine ajouté aux domaines autorisés de Firebase.',
+    'auth.fileTitle': 'Mode fichier local',
+    'auth.fileNote': 'Vous ouvrez NexusAI en fichier local : la connexion Google n\'est pas disponible ici. La connexion par e-mail/mot de passe fonctionne — ou servez ce dossier depuis <span class="text-slate-300">http://localhost</span> pour une connexion complète. Vous pouvez fermer cette fenêtre et continuer à discuter sans compte.',
+    'auth.signin': 'Se connecter',
+    'auth.signup': 'Créer un compte',
+    'auth.google': 'Continuer avec Google',
+    'auth.or': 'ou',
+    'auth.name': 'Nom affiché (facultatif)',
+    'auth.email': 'Adresse e-mail',
+    'auth.password': 'Mot de passe (6 caractères min.)',
+    'auth.signout': 'Se déconnecter',
+    'auth.account': 'Compte',
+    'auth.user': 'Utilisateur',
+    'set.title': 'Paramètres',
+    'set.account': 'Compte',
+    'set.prefs': 'Préférences',
+    'set.data': 'Données et confidentialité',
+    'set.usage': 'Limites d\'utilisation',
+    'set.free': 'Gratuit',
+    'set.upgrade': 'Passez à NexusAI Plus',
+    'set.personalized': 'Intelligence personnalisée',
+    'set.skills': 'Compétences',
+    'set.gems': 'Gems',
+    'set.theme': 'Thème',
+    'set.dark': 'Sombre',
+    'set.light': 'Clair',
+    'set.watermark': 'Filigrane développeur',
+    'set.lang': 'Langue',
+    'set.sttLang': 'Langue de la saisie vocale',
+    'set.sttEn': 'Anglais',
+    'set.sttAr': 'Arabe',
+    'set.ttsSpeed': 'Vitesse de lecture',
+    'set.ttsSlow': 'Lent (0.8×)',
+    'set.ttsNormal': 'Normal (1×)',
+    'set.ttsFast': 'Rapide (1.2×)',
+    'set.publicLinks': 'Vos liens publics',
+    'set.none': 'Aucun',
+    'set.feedback': 'Envoyer des commentaires',
+    'set.help': 'Aide',
+    'set.location': 'Lieu',
+    'set.undefined': 'Non défini',
+    'set.activity': 'Activité',
+    'set.deleteChats': 'Supprimer toutes les discussions',
+    'info.usage': 'Plan Gratuit — réponses illimitées avec le modèle gratuit actuel.',
+    'info.upgrade': 'NexusAI Plus arrive bientôt — restez à l\'écoute !',
+    'info.skills': 'Compétences — bientôt disponible.',
+    'info.gems': 'Gems — bientôt disponible.',
+    'info.publicLinks': 'Aucun lien public pour le moment.',
+    'info.feedback': 'Merci ! Envoyez vos retours à contact@nexusai.local',
+    'info.help': 'Aide : servez l\'app via http://localhost pour activer toutes les fonctions.',
+    'info.location': 'Lieu : non défini.',
+    'info.activity': 'Activité : l\'historique détaillé arrive bientôt.',
+    'toast.themeLight': 'Thème clair activé',
+    'toast.themeDark': 'Thème sombre activé',
+    'toast.watermarkOn': 'Filigrane affiché',
+    'toast.watermarkOff': 'Filigrane masqué',
+    'toast.personalizedOn': 'Intelligence personnalisée activée',
+    'toast.personalizedOff': 'Intelligence personnalisée désactivée',
+    'toast.tts': 'Vitesse de lecture mise à jour',
+    'toast.chatsDeleted': 'Toutes les discussions ont été supprimées',
+    'toast.lang': 'Langue mise à jour',
+    'toast.copied': 'Copié',
+    'toast.copyFail': 'Impossible de copier',
+    'toast.signedInGoogle': 'Connecté avec Google',
+    'toast.signedIn': 'Connecté',
+    'toast.accountCreated': 'Compte créé — bienvenue !',
+    'toast.signedOut': 'Déconnecté',
+    'toast.maxFiles': '5 fichiers maximum à la fois',
+    'toast.ttsUnsupported': 'La synthèse vocale n\'est pas prise en charge par ce navigateur',
+    'toast.sttUnsupported': 'La saisie vocale n\'est pas prise en charge — essayez Chrome ou Edge',
+    'toast.micDenied': 'Accès au micro refusé',
+    'toast.micError': 'Erreur de saisie vocale : {e}',
+    'toast.micStartFail': 'Impossible de démarrer la saisie vocale',
+    'asst.read': 'Lire à voix haute',
+    'asst.copy': 'Copier la réponse',
+    'asst.retry': 'Réessayer',
+    'err.hint': 'Vérifiez votre connexion Internet puis réessayez.',
+    'err.empty': 'Le modèle a renvoyé une réponse vide.',
+    'err.cancelled': 'Requête annulée.',
+    'err.http': 'Échec de la requête OpenRouter (HTTP {status})',
+    'authErr.default': 'Échec de l\'authentification',
+    'authErr.env': 'La connexion Google n\'est pas prise en charge lorsque l\'application est ouverte en fichier local. Servez NexusAI depuis http://localhost (ou un domaine autorisé) pour utiliser Google — l\'e-mail/mot de passe fonctionne ici, et vous pouvez continuer à discuter sans compte.',
+    'authErr.config': 'L\'authentification n\'est pas activée pour ce projet Firebase. Ouvrez la console Firebase → Authentication → Sign-in method et activez E-mail/Mot de passe (et Google pour les domaines web).',
+    'authErr.apiKey': 'La clé API Firebase est invalide ou restreinte. Vérifiez la clé dans les paramètres du projet et ajoutez cette origine aux référents autorisés.',
+    'authErr.domain': 'Ce domaine n\'est pas autorisé pour Firebase Authentication. Ajoutez-le sous Authentication → Paramètres → Domaines autorisés.',
+    'authErr.network': 'Erreur réseau — vérifiez votre connexion Internet puis réessayez.',
+    'authErr.notConfigured': 'Firebase n\'est pas configuré — suivez les étapes ci-dessus.',
+    'rel.now': 'à l\'instant',
+    'rel.minAgo': 'il y a {m} min',
+    'rel.hourAgo': 'il y a {h} h',
+    'modes.general': 'Général'
+  },
+  ar: {
+    'app.title': 'NexusAI — مساعد محادثة ذكي',
+    'online': 'متصل',
+    'newChat': 'محادثة جديدة',
+    'deleteChat': 'حذف المحادثة',
+    'settings': 'الإعدادات',
+    'toggleSidebar': 'إظهار/إخفاء الشريط الجانبي',
+    'collapseSidebar': 'طي الشريط الجانبي',
+    'sidebar.history': 'سجل المحادثات',
+    'sidebar.empty': 'لا توجد محادثات بعد.<br>ابدأ محادثة جديدة!',
+    'empty.ask': 'كيف يمكنني مساعدتك اليوم؟',
+    'pop.upload': 'رفع ملف',
+    'pop.uploadDesc': 'صور، ملفات PDF، مستندات',
+    'attach': 'إضافة ملفات أو أدوات',
+    'input.placeholder': 'اكتب رسالتك إلى NexusAI…',
+    'voiceLang': 'لغة الصوت والإدخال',
+    'voiceInput': 'إدخال صوتي',
+    'send': 'إرسال',
+    'footer.powered': 'مدعوم من OpenRouter · {model} · Enter ↵ للإرسال · Shift+Enter لسطر جديد',
+    'auth.title': 'مرحباً بك في NexusAI',
+    'auth.subtitle': 'سجّل الدخول لمزامنة تجربتك والوصول إلى حسابك.',
+    'auth.setupTitle': 'لم يتم إعداد Firebase بعد',
+    'auth.setup1': 'أنشئ مشروعاً على <span class="text-slate-300">console.firebase.google.com</span>',
+    'auth.setup2': 'فعّل <span class="text-slate-300">المصادقة ← Google + البريد/كلمة المرور</span>',
+    'auth.setup3': 'انسخ إعدادات الويب إلى <span class="text-slate-300">FIREBASE_CONFIG</span> في index.html',
+    'auth.setupNote': 'يتطلب تسجيل الدخول عبر Google أيضاً تشغيل هذه الصفحة من <span class="text-slate-400">http://localhost</span> أو نطاق تضيفه إلى النطاقات المصرح بها في Firebase.',
+    'auth.fileTitle': 'وضع الملف المحلي',
+    'auth.fileNote': 'أنت تفتح NexusAI كملف محلي، لذا تسجيل الدخول عبر Google غير متاح هنا. تسجيل الدخول بالبريد وكلمة المرور يعمل — أو شغّل هذا المجلد من <span class="text-slate-300">http://localhost</span> لتسجيل دخول كامل. يمكنك إغلاق هذه النافذة ومتابعة المحادثة بدون حساب.',
+    'auth.signin': 'تسجيل الدخول',
+    'auth.signup': 'إنشاء حساب',
+    'auth.google': 'المتابعة باستخدام Google',
+    'auth.or': 'أو',
+    'auth.name': 'الاسم المعروض (اختياري)',
+    'auth.email': 'عنوان البريد الإلكتروني',
+    'auth.password': 'كلمة المرور (6 أحرف على الأقل)',
+    'auth.signout': 'تسجيل الخروج',
+    'auth.account': 'الحساب',
+    'auth.user': 'مستخدم',
+    'set.title': 'الإعدادات',
+    'set.account': 'الحساب',
+    'set.prefs': 'التفضيلات',
+    'set.data': 'البيانات والخصوصية',
+    'set.usage': 'حدود الاستخدام',
+    'set.free': 'مجاني',
+    'set.upgrade': 'الترقية إلى NexusAI Plus',
+    'set.personalized': 'ذكاء شخصي',
+    'set.skills': 'المهارات',
+    'set.gems': 'الجواهر',
+    'set.theme': 'المظهر',
+    'set.dark': 'داكن',
+    'set.light': 'فاتح',
+    'set.watermark': 'العلامة المائية للمطور',
+    'set.lang': 'اللغة',
+    'set.sttLang': 'لغة الإدخال الصوتي',
+    'set.sttEn': 'الإنجليزية',
+    'set.sttAr': 'العربية',
+    'set.ttsSpeed': 'سرعة القراءة',
+    'set.ttsSlow': 'بطيء (0.8×)',
+    'set.ttsNormal': 'عادي (1×)',
+    'set.ttsFast': 'سريع (1.2×)',
+    'set.publicLinks': 'روابطك العامة',
+    'set.none': 'لا شيء',
+    'set.feedback': 'إرسال ملاحظات',
+    'set.help': 'مساعدة',
+    'set.location': 'الموقع',
+    'set.undefined': 'غير محدد',
+    'set.activity': 'النشاط',
+    'set.deleteChats': 'حذف جميع المحادثات',
+    'info.usage': 'الخطة المجانية — ردود غير محدودة مع النموذج المجاني الحالي.',
+    'info.upgrade': 'NexusAI Plus قادم قريباً — ترقبوا!',
+    'info.skills': 'المهارات — قريباً.',
+    'info.gems': 'الجواهر — قريباً.',
+    'info.publicLinks': 'لا توجد روابط عامة بعد.',
+    'info.feedback': 'شكراً! أرسل ملاحظاتك إلى contact@nexusai.local',
+    'info.help': 'مساعدة: شغّل التطبيق عبر http://localhost لتفعيل جميع الميزات.',
+    'info.location': 'الموقع: غير محدد.',
+    'info.activity': 'النشاط: السجل المفصل قادم قريباً.',
+    'toast.themeLight': 'تم تفعيل المظهر الفاتح',
+    'toast.themeDark': 'تم تفعيل المظهر الداكن',
+    'toast.watermarkOn': 'تم إظهار العلامة المائية',
+    'toast.watermarkOff': 'تم إخفاء العلامة المائية',
+    'toast.personalizedOn': 'تم تفعيل الذكاء الشخصي',
+    'toast.personalizedOff': 'تم تعطيل الذكاء الشخصي',
+    'toast.tts': 'تم تحديث سرعة القراءة',
+    'toast.chatsDeleted': 'تم حذف جميع المحادثات',
+    'toast.lang': 'تم تحديث اللغة',
+    'toast.copied': 'تم النسخ',
+    'toast.copyFail': 'تعذر النسخ',
+    'toast.signedInGoogle': 'تم تسجيل الدخول عبر Google',
+    'toast.signedIn': 'تم تسجيل الدخول',
+    'toast.accountCreated': 'تم إنشاء الحساب — أهلاً بك!',
+    'toast.signedOut': 'تم تسجيل الخروج',
+    'toast.maxFiles': '5 ملفات كحد أقصى في المرة الواحدة',
+    'toast.ttsUnsupported': 'قراءة النص غير مدعومة في هذا المتصفح',
+    'toast.sttUnsupported': 'الإدخال الصوتي غير مدعوم — جرّب Chrome أو Edge',
+    'toast.micDenied': 'تم رفض الوصول إلى الميكروفون',
+    'toast.micError': 'خطأ في الإدخال الصوتي: {e}',
+    'toast.micStartFail': 'تعذر بدء الإدخال الصوتي',
+    'asst.read': 'قراءة بصوت عالٍ',
+    'asst.copy': 'نسخ الرد',
+    'asst.retry': 'إعادة المحاولة',
+    'err.hint': 'تحقق من اتصالك بالإنترنت ثم حاول مرة أخرى.',
+    'err.empty': 'أعاد النموذج رداً فارغاً.',
+    'err.cancelled': 'تم إلغاء الطلب.',
+    'err.http': 'فشل طلب OpenRouter (HTTP {status})',
+    'authErr.default': 'فشلت المصادقة',
+    'authErr.env': 'تسجيل الدخول عبر Google غير مدعوم عند تشغيل التطبيق كملف محلي. شغّل NexusAI من http://localhost (أو نطاق مصرح به) لاستخدام Google — تسجيل الدخول بالبريد وكلمة المرور يعمل هنا، ويمكنك مواصلة المحادثة بدون حساب.',
+    'authErr.config': 'المصادقة غير مفعلة لمشروع Firebase هذا. افتح وحدة تحكم Firebase ← المصادقة ← طريقة تسجيل الدخول وفعّل البريد/كلمة المرور (وGoogle لنطاقات الويب).',
+    'authErr.apiKey': 'مفتاح Firebase API غير صالح أو مقيّد. تحقق من المفتاح في إعدادات المشروع وأضف هذا الأصل إلى النطاقات المسموحة.',
+    'authErr.domain': 'هذا النطاق غير مصرح به لمصادقة Firebase. أضفه ضمن المصادقة ← الإعدادات ← النطاقات المصرح بها.',
+    'authErr.network': 'خطأ في الشبكة — تحقق من اتصالك بالإنترنت ثم حاول مرة أخرى.',
+    'authErr.notConfigured': 'لم يتم إعداد Firebase — اتبع خطوات الإعداد أعلاه.',
+    'rel.now': 'الآن',
+    'rel.minAgo': 'منذ {m} د',
+    'rel.hourAgo': 'منذ {h} س',
+    'modes.general': 'عام'
+  }
+};
+
+function t(key) {
+  return (I18N[curLang] && I18N[curLang][key]) || I18N.en[key] || key;
+}
+function tf(key, vars) {
+  let s = t(key);
+  for (const k in vars) s = s.replace('{' + k + '}', vars[k]);
+  return s;
+}
+function L(m) { return (m.labels && m.labels[curLang]) || m.label; }
+function TL(m) { return (m.taglines && m.taglines[curLang]) || m.tagline; }
+
+function syncLangUI() {
+  const ids = { ar: 'langAr', fr: 'langFr', en: 'langEn' };
+  Object.keys(ids).forEach(key => {
+    const b = document.getElementById(ids[key]);
+    if (b) b.classList.toggle('seg-on', key === curLang);
+  });
+}
+
+function applyLang() {
+  document.documentElement.lang = curLang;
+  document.documentElement.dir = curLang === 'ar' ? 'rtl' : 'ltr';
+  document.title = t('app.title');
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.setAttribute('placeholder', t(el.dataset.i18nPh)); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => { el.setAttribute('title', t(el.dataset.i18nTitle)); });
+  const fl = $('#footerLine');
+  if (fl) fl.textContent = t('footer.powered').replace('{model}', OR_MODEL);
+  const as = $('#authSubmit');
+  if (as) as.textContent = authMode === 'signin' ? t('auth.signin') : t('auth.signup');
+  renderModeBar();
+  renderSuggestions();
+  renderSidebar();
+  emptyTagline.textContent = TL(currentMode);
+  updateAuthUI(auth ? auth.currentUser : null);
+  syncLangUI();
+  const chat = getActiveChat();
+  if (chatList.children.length && (!chat || !chat.messages.length)) {
+    chatList.innerHTML = '';
+    appendWelcome(currentMode);
+  }
+}
+
+function setLang(l) {
+  if (l === curLang) return;
+  curLang = l;
+  localStorage.setItem('nexus_lang', l);
+  applyLang();
+  showToast(t('toast.lang'));
+}
+
+/* ---------- Storage helpers ---------- */
+function loadJSON(key, fallback) {
+  try {
+    const v = localStorage.getItem(key);
+    return v ? JSON.parse(v) : fallback;
+  } catch (e) { return fallback; }
+}
+function saveJSON(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+}
+
+/* ---------- Helpers ---------- */
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function isArabic(t) { return /[\u0600-\u06FF]/.test(t); }
+function timeNow() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+function fmtSize(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1048576).toFixed(1) + ' MB';
+}
+function relTime(ts) {
+  const d = Date.now() - ts;
+  if (d < 60000) return t('rel.now');
+  if (d < 3600000) return t('rel.minAgo').replace('{m}', Math.floor(d / 60000));
+  if (d < 86400000) return t('rel.hourAgo').replace('{h}', Math.floor(d / 3600000));
+  return new Date(ts).toLocaleDateString();
+}
+function scrollBottom() { chatScroll.scrollTop = chatScroll.scrollHeight; }
+
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.remove('opacity-0');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.add('opacity-0'), 2600);
+}
+
+/* ---------- Settings / preferences ---------- */
+function applySttLang(lang) {
+  sttLang = lang;
+  localStorage.setItem('nexus_stt_lang', lang);
+  langBtn.textContent = lang === 'en-US' ? 'EN' : 'عربي';
+}
+function ttsRate() { return parseFloat(localStorage.getItem('nexus_tts_rate') || '1'); }
+
+/* ---------- Markdown rendering ---------- */
+function mdToHtml(src) {
+  const lines = String(src || '').replace(/\r\n/g, '\n').split('\n');
+  let html = '', listType = null;
+  const closeList = () => { if (listType) { html += listType === 'ul' ? '</ul>' : '</ol>'; listType = null; } };
+  const inline = s => {
+    s = escapeHtml(s);
+    s = s.replace(/`([^`\n]+)`/g, '<code class="px-1 py-0.5 rounded-md bg-white/10 text-violet-300 text-[13px] font-mono">$1</code>');
+    s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong class="font-semibold text-slate-100">$1</strong>');
+    s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em class="italic text-slate-300">$2</em>');
+    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-violet-400 underline underline-offset-2 hover:text-violet-300">$1</a>');
+    return s;
+  };
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const fence = line.match(/^```(\S*)/);
+    if (fence) {
+      closeList();
+      let code = '';
+      i++;
+      while (i < lines.length && !/^\s*```\s*$/.test(lines[i])) { code += lines[i] + '\n'; i++; }
+      if (i < lines.length) i++;
+      html += '<pre class="my-2 overflow-x-auto rounded-xl bg-black/40 border border-white/10 p-3 text-[13px] leading-6 font-mono text-slate-200"><code>' + escapeHtml(code.replace(/\n$/, '')) + '</code></pre>';
+      continue;
+    }
+    if (/^\s*$/.test(line)) { closeList(); i++; continue; }
+    const h = line.match(/^(#{1,4})\s+(.*)/);
+    if (h) {
+      closeList();
+      const sizes = ['text-lg font-bold text-slate-100', 'text-base font-semibold text-slate-100', 'text-[15px] font-semibold text-slate-200', 'text-[14px] font-semibold text-slate-200'];
+      html += '<h4 class="mt-2.5 mb-1 ' + sizes[h[1].length - 1] + '">' + inline(h[2]) + '</h4>';
+      i++;
+      continue;
+    }
+    if (/^\s*(---|\*\*\*)\s*$/.test(line)) { closeList(); html += '<hr class="border-white/10 my-2">'; i++; continue; }
+    const bq = line.match(/^\s*>\s?(.*)/);
+    if (bq) { closeList(); html += '<blockquote class="border-l-2 border-violet-500/60 pl-3 text-slate-400">' + inline(bq[1]) + '</blockquote>'; i++; continue; }
+    const ul = line.match(/^\s*[-*•]\s+(.*)/);
+    if (ul) {
+      if (listType !== 'ul') { closeList(); html += '<ul class="mt-1.5 space-y-1 list-disc pl-5 marker:text-violet-400">'; listType = 'ul'; }
+      html += '<li>' + inline(ul[1]) + '</li>';
+      i++;
+      continue;
+    }
+    const ol = line.match(/^\s*\d+[.)]\s+(.*)/);
+    if (ol) {
+      if (listType !== 'ol') { closeList(); html += '<ol class="mt-1.5 space-y-1 list-decimal pl-5 marker:text-slate-500">'; listType = 'ol'; }
+      html += '<li>' + inline(ol[1]) + '</li>';
+      i++;
+      continue;
+    }
+    closeList();
+    let para = line;
+    i++;
+    while (i < lines.length && !/^\s*$/.test(lines[i]) &&
+           !/^(```|#{1,4}\s|\s*[-*•]\s|\s*\d+[.)]\s|\s*(---|\*\*\*)\s*$|\s*>)/.test(lines[i])) {
+      para += '\n' + lines[i];
+      i++;
+    }
+    html += '<p class="leading-7">' + inline(para).replace(/\n/g, '<br>') + '</p>';
+  }
+  closeList();
+  return html;
+}
+
+function mdToPlain(src) {
+  return String(src || '')
+    .replace(/```[\s\S]*?(?:```|$)/g, m => m.replace(/^```\S*\s*/, '').replace(/\s*```\s*$/, ''))
+    .replace(/^#{1,4}\s+/gm, '')
+    .replace(/^\s*>\s?/gm, '')
+    .replace(/^\s*[-*•]\s+/gm, '• ')
+    .replace(/^\s*\d+[.)]\s+/gm, '')
+    .replace(/^\s*(---|\*\*\*)\s*$/gm, '')
+    .replace(/\*\*([^*\n]+)\*\*/g, '$1')
+    .replace(/`([^`\n]+)`/g, '$1')
+    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1$2')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/* ---------- Chats (localStorage persistence) ---------- */
+function saveChats() {
+  saveJSON('nexus_chats', chats.slice(0, 50));
+}
+function getActiveChat() {
+  return chats.find(c => c.id === activeChatId) || null;
+}
+function ensureActiveChat() {
+  let chat = getActiveChat();
+  if (!chat) {
+    chat = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), title: t('newChat'), mode: currentMode.id, createdAt: Date.now(), updatedAt: Date.now(), messages: [] };
+    chats.unshift(chat);
+    activeChatId = chat.id;
+    localStorage.setItem('nexus_active_chat', chat.id);
+    saveChats();
+    renderSidebar();
+  }
+  return chat;
+}
+function newChat() {
+  cancelActiveStream();
+  activeChatId = null;
+  localStorage.removeItem('nexus_active_chat');
+  chatList.innerHTML = '';
+  emptyState.classList.remove('hidden');
+  renderSuggestions();
+  appendWelcome(currentMode);
+  renderSidebar();
+}
+function deleteChat(id, e) {
+  if (e) e.stopPropagation();
+  chats = chats.filter(c => c.id !== id);
+  saveChats();
+  if (activeChatId === id) newChat();
+  renderSidebar();
+}
+function loadChat(chat) {
+  cancelActiveStream();
+  activeChatId = chat.id;
+  localStorage.setItem('nexus_active_chat', chat.id);
+  currentMode = MODES.find(m => m.id === chat.mode) || MODES[0];
+  renderModeBar();
+  emptyTagline.textContent = TL(currentMode);
+  renderSuggestions();
+  chatList.innerHTML = '';
+  if (!chat.messages.length) {
+    emptyState.classList.remove('hidden');
+    appendWelcome(currentMode);
+  } else {
+    chat.messages.forEach(m => {
+      if (m.role === 'user') appendUser(m.content, []);
+      else appendAssistantStatic(m.content);
+    });
+  }
+  renderSidebar();
+  scrollBottom();
+}
+function renderSidebar() {
+  const list = $('#chatListSidebar');
+  list.innerHTML = '';
+  const sorted = [...chats].sort((a, b) => b.updatedAt - a.updatedAt);
+  if (!sorted.length) {
+    list.innerHTML = '<p class="text-[12px] text-slate-600 text-center py-6 px-3">' + t('sidebar.empty') + '</p>';
+    return;
+  }
+  sorted.forEach(chat => {
+    const mode = MODES.find(m => m.id === chat.mode);
+    const item = document.createElement('div');
+    item.className = 'group flex items-center gap-2.5 px-3 py-2.5 rounded-xl cursor-pointer transition ' +
+      (chat.id === activeChatId ? 'bg-white/10 border border-white/10' : 'hover:bg-white/5 border border-transparent');
+    item.innerHTML =
+      '<span class="text-slate-500 shrink-0">' + icon('message', 'w-4 h-4') + '</span>' +
+      '<div class="min-w-0 flex-1">' +
+        '<p class="text-[13px] font-medium text-slate-200 truncate">' + escapeHtml(chat.title) + '</p>' +
+        '<p class="text-[10.5px] text-slate-500 truncate">' + (mode ? L(mode) : t('modes.general')) + ' · ' + relTime(chat.updatedAt) + '</p>' +
+      '</div>' +
+      '<button title="' + t('deleteChat') + '" class="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-md hover:bg-rose-500/20 text-slate-500 hover:text-rose-300 transition flex items-center justify-center shrink-0">' + icon('trash', 'w-3.5 h-3.5') + '</button>';
+    item.onclick = () => { if (chat.id !== activeChatId) loadChat(chat); };
+    item.querySelector('button').onclick = e => deleteChat(chat.id, e);
+    list.appendChild(item);
+  });
+}
+
+/* ---------- Rendering ---------- */
+function renderModeBar() {
+  modeBar.innerHTML = '';
+  MODES.forEach(m => {
+    const b = document.createElement('button');
+    b.className = 'mode-pill shrink-0 inline-flex items-center gap-2 h-9 px-4 rounded-full text-sm font-medium transition ' +
+      (m.id === currentMode.id
+        ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-fuchsia-900/40'
+        : 'text-slate-400 hover:text-white hover:bg-white/5');
+    b.innerHTML = icon(m.icon, 'w-4 h-4') + '<span>' + L(m) + '</span>';
+    b.onclick = () => setMode(m);
+    modeBar.appendChild(b);
+  });
+}
+
+function renderSuggestions() {
+  suggestions.innerHTML = '';
+  const list = currentMode.suggestions[curLang] || currentMode.suggestions.en;
+  list.forEach(s => {
+    const b = document.createElement('button');
+    b.className = 'px-4 py-2 rounded-full border border-white/10 bg-white/[0.03] text-[13px] text-slate-300 hover:bg-white/10 hover:border-violet-500/40 transition';
+    b.textContent = s;
+    b.onclick = () => { input.value = s; sendMessage(); };
+    suggestions.appendChild(b);
+  });
+}
+
+function addDivider(label) {
+  const d = document.createElement('div');
+  d.className = 'msg flex items-center gap-3 my-2';
+  d.innerHTML = '<div class="h-px flex-1 bg-white/5"></div>' +
+    '<span class="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-semibold">' + label + '</span>' +
+    '<div class="h-px flex-1 bg-white/5"></div>';
+  chatList.appendChild(d);
+  scrollBottom();
+}
+
+function assistantShell(modeLabel) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg flex gap-3';
+  wrap.innerHTML =
+    '<div class="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 via-fuchsia-500 to-cyan-400 flex items-center justify-center shrink-0 shadow-lg shadow-fuchsia-950/40">' +
+      '<svg viewBox="0 0 24 24" class="w-[18px] h-[18px]" fill="white"><path d="M12 2l2.4 6.2L21 10l-6.6 1.8L12 18l-2.4-6.2L3 10l6.6-1.8L12 2z"/></svg>' +
+    '</div>' +
+    '<div class="min-w-0 max-w-[85%]">' +
+      '<div class="flex items-baseline gap-2 mb-1">' +
+        '<span class="text-[13px] font-semibold text-slate-200">NexusAI</span>' +
+        '<span class="px-1.5 py-px rounded-md bg-violet-500/15 text-violet-300 text-[10px] font-semibold">' + modeLabel + '</span>' +
+        '<span class="text-[10px] text-slate-600">' + timeNow() + '</span>' +
+      '</div>' +
+      '<div class="bg-[#111827] border border-white/5 rounded-2xl rounded-tl-sm px-4 py-3 shadow-lg shadow-black/30">' +
+        '<div class="msg-body text-[14.5px] leading-7 text-slate-300" dir="auto"></div>' +
+        '<div class="msg-actions mt-2.5 pt-2 border-t border-white/5 flex items-center gap-1"></div>' +
+      '</div>' +
+    '</div>';
+  return wrap;
+}
+
+function actionBtn(kind, title, text, lang, handler) {
+  const b = document.createElement('button');
+  b.title = title;
+  b.className = 'w-7 h-7 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/5 transition flex items-center justify-center';
+  b.innerHTML = icon(kind, 'w-3.5 h-3.5');
+  b.dataset.text = text || '';
+  if (lang) b.dataset.lang = lang;
+  b.onclick = () => handler(b);
+  return b;
+}
+
+function attachActions(shell, plain) {
+  const actions = shell.querySelector('.msg-actions');
+  actions.appendChild(actionBtn('speak', t('asst.read'), plain, isArabic(plain) ? 'ar-SA' : 'en-US', onSpeak));
+  actions.appendChild(actionBtn('copy', t('asst.copy'), plain, null, onCopy));
+}
+
+function appendWelcome(mode) {
+  const wrap = assistantShell(L(mode));
+  const md = mode.welcome[curLang] || mode.welcome.en;
+  wrap.querySelector('.msg-body').innerHTML = mdToHtml(md);
+  attachActions(wrap, mdToPlain(md));
+  chatList.appendChild(wrap);
+  scrollBottom();
+}
+
+function appendAssistantStatic(md) {
+  const wrap = assistantShell(L(currentMode));
+  wrap.querySelector('.msg-body').innerHTML = mdToHtml(md);
+  attachActions(wrap, mdToPlain(md));
+  chatList.appendChild(wrap);
+}
+
+function appendError(msg, retryContent) {
+  const wrap = assistantShell(L(currentMode));
+  const body = wrap.querySelector('.msg-body');
+  body.innerHTML = '<p class="text-rose-300 text-[14px] leading-7">⚠️ ' + escapeHtml(msg) + '</p>' +
+    '<p class="text-slate-500 text-[12px] mt-2 leading-5">' + t('err.hint') + '</p>';
+  const actions = wrap.querySelector('.msg-actions');
+  if (retryContent) {
+    const b = document.createElement('button');
+    b.className = 'h-8 px-3 rounded-lg bg-rose-500/15 text-rose-300 hover:bg-rose-500/25 text-xs font-semibold flex items-center gap-1.5 transition';
+    b.innerHTML = icon('refresh', 'w-3.5 h-3.5') + '<span>' + t('asst.retry') + '</span>';
+    b.onclick = () => { appendUser(retryContent, []); streamAssistant(retryContent); };
+    actions.appendChild(b);
+  }
+  chatList.appendChild(wrap);
+  scrollBottom();
+}
+
+function appendUser(text, files) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg flex justify-end';
+  const inner = document.createElement('div');
+  inner.className = 'max-w-[85%]';
+  const bubble = document.createElement('div');
+  bubble.className = 'bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-2xl rounded-tr-sm px-4 py-3 shadow-lg shadow-fuchsia-950/30';
+  bubble.dir = 'auto';
+
+  if (files && files.length) {
+    const frow = document.createElement('div');
+    frow.className = 'flex flex-wrap gap-1.5 mb-2';
+    files.forEach(f => {
+      const chip = document.createElement('span');
+      chip.className = 'inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/15 text-white text-[11px] font-medium';
+      chip.innerHTML = (f.type.startsWith('image/') ? icon('image','w-3.5 h-3.5') : icon('file','w-3.5 h-3.5')) + '<span class="max-w-[140px] truncate">' + escapeHtml(f.name) + '</span>';
+      frow.appendChild(chip);
+    });
+    bubble.appendChild(frow);
+  }
+  if (text) {
+    const p = document.createElement('p');
+    p.className = 'text-[14.5px] leading-7 text-white whitespace-pre-wrap';
+    p.textContent = text;
+    bubble.appendChild(p);
+  }
+  inner.appendChild(bubble);
+  const time = document.createElement('div');
+  time.className = 'text-right text-[10px] text-slate-600 mt-1 pr-1';
+  time.textContent = timeNow();
+  inner.appendChild(time);
+  wrap.appendChild(inner);
+  chatList.appendChild(wrap);
+  emptyState.classList.add('hidden');
+  scrollBottom();
+}
+
+function showTyping() {
+  const wrap = assistantShell(L(currentMode));
+  wrap.querySelector('.msg-body').innerHTML = '<div class="flex items-center gap-1.5 py-1.5"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>';
+  wrap.querySelector('.msg-actions').remove();
+  wrap.id = 'typingEl';
+  chatList.appendChild(wrap);
+  scrollBottom();
+}
+
+/* ---------- OpenRouter streaming ---------- */
+function cancelActiveStream() {
+  chatEpoch++;
+  if (activeAbort) { try { activeAbort.abort(); } catch (e) {} }
+  const t = document.getElementById('typingEl');
+  if (t) t.remove();
+  if (streamShell && streamShell.isConnected) streamShell.remove();
+  streamShell = null;
+  activeAbort = null;
+  busy = false;
+  updateSend();
+}
+
+async function streamAssistant(userContent) {
+  const mode = currentMode;
+  const chatId = activeChatId;
+  const epoch = ++chatEpoch;
+  busy = true;
+  updateSend();
+  showTyping();
+  const typingEl = document.getElementById('typingEl');
+  const context = getActiveChat() ? getActiveChat().messages.slice(-16) : [];
+  const messages = [
+    { role: 'system', content: mode.prompt + (localStorage.getItem('nexus_personalized') === 'on' ? '\nPersonalize your tone and style to this specific user based on the conversation.' : '') },
+    ...context.map(m => ({ role: m.role, content: m.content })),
+    { role: 'user', content: userContent }
+  ];
+  let shell = null;
+  let full = '';
+  try {
+    const ctrl = new AbortController();
+    activeAbort = ctrl;
+    const res = await fetch(OR_ENDPOINT, {
+      method: 'POST',
+      headers: OR_HEADERS,
+      body: JSON.stringify({
+        model: OR_MODEL,
+        messages,
+        stream: true,
+        temperature: 0.7,
+        max_tokens: 2048
+      }),
+      signal: ctrl.signal
+    });
+
+    if (!res.ok) {
+      let msg = tf('err.http', { status: res.status });
+      try {
+        const j = await res.json();
+        if (j && j.error && j.error.message) msg = j.error.message;
+      } catch (e) {}
+      throw new Error(msg);
+    }
+
+    const renderLive = () => {
+      shell.querySelector('.msg-body').innerHTML = mdToHtml(full) + '<span class="stream-cursor"></span>';
+    };
+
+    if (!res.body) {
+      const j = await res.json();
+      full = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+      if (!full) throw new Error(t('err.empty'));
+    } else {
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '', lastRender = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+          const t = line.trim();
+          if (!t.startsWith('data:')) continue;
+          const payload = t.slice(5).trim();
+          if (!payload) continue;
+          if (payload === '[DONE]') continue;
+          let json;
+          try { json = JSON.parse(payload); } catch (e) { continue; }
+          const choice = json.choices && json.choices[0];
+          const delta = choice && choice.delta && (choice.delta.content || '') || '';
+          if (!delta) continue;
+          full += delta;
+          if (!shell) {
+            if (typingEl && typingEl.isConnected) typingEl.remove();
+            shell = assistantShell(L(mode));
+            streamShell = shell;
+            chatList.appendChild(shell);
+            emptyState.classList.add('hidden');
+          }
+          const now = Date.now();
+          if (now - lastRender > 60) { lastRender = now; renderLive(); scrollBottom(); }
+        }
+      }
+    }
+
+    if (epoch !== chatEpoch) return;
+
+    if (!shell) {
+      if (typingEl && typingEl.isConnected) typingEl.remove();
+      if (!full) { appendError(t('err.empty')); return; }
+      shell = assistantShell(L(mode));
+      streamShell = shell;
+      chatList.appendChild(shell);
+      emptyState.classList.add('hidden');
+    }
+    shell.querySelector('.msg-body').innerHTML = mdToHtml(full);
+    attachActions(shell, mdToPlain(full));
+    scrollBottom();
+    streamShell = null;
+
+    const chat = chats.find(c => c.id === chatId);
+    if (chat) {
+      chat.messages.push({ role: 'assistant', content: full, ts: Date.now() });
+      chat.updatedAt = Date.now();
+      saveChats();
+      renderSidebar();
+    }
+  } catch (err) {
+    if (epoch !== chatEpoch) return;
+    if (typingEl && typingEl.isConnected) typingEl.remove();
+    if (shell && shell.isConnected) shell.remove();
+    streamShell = null;
+    appendError(err.name === 'AbortError' ? t('err.cancelled') : String(err.message || err), userContent);
+  } finally {
+    activeAbort = null;
+    busy = false;
+    updateSend();
+  }
+}
+
+/* ---------- Send flow ---------- */
+function sendMessage() {
+  if (busy) cancelActiveStream();
+  const text = input.value.trim();
+  if (!text && !pendingFiles.length) return;
+  const files = [...pendingFiles];
+  let content;
+  if (text) {
+    content = files.length ? text + '\n\n[Attached files: ' + files.map(f => f.name).join(', ') + ']' : text;
+  } else {
+    content = 'The user attached these files: ' + files.map(f => f.name).join(', ') + '. Acknowledge them briefly and ask what the user would like to do with them.';
+  }
+  const chat = ensureActiveChat();
+  chat.mode = currentMode.id;
+  appendUser(text, files);
+  input.value = '';
+  pendingFiles = [];
+  renderPreviews();
+  autoGrow();
+  updateSend();
+  chat.messages.push({ role: 'user', content, ts: Date.now() });
+  if (chat.title === t('newChat') || chat.title === I18N.en.newChat || chat.title === I18N.fr.newChat || chat.title === I18N.ar.newChat) chat.title = (text || 'File upload').slice(0, 42);
+  chat.updatedAt = Date.now();
+  saveChats();
+  renderSidebar();
+  streamAssistant(content);
+}
+
+function setMode(m) {
+  if (m.id === currentMode.id) return;
+  cancelActiveStream();
+  currentMode = m;
+  const chat = getActiveChat();
+  if (chat) { chat.mode = m.id; chat.updatedAt = Date.now(); saveChats(); renderSidebar(); }
+  renderModeBar();
+  emptyTagline.textContent = TL(m);
+  renderSuggestions();
+  addDivider(L(m));
+  appendWelcome(m);
+}
+
+/* ---------- Input mechanics ---------- */
+function autoGrow() {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 160) + 'px';
+}
+function updateSend() {
+  sendBtn.disabled = busy || (!input.value.trim() && !pendingFiles.length);
+}
+input.addEventListener('input', () => { autoGrow(); updateSend(); });
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+sendBtn.addEventListener('click', sendMessage);
+
+/* ---------- Sidebar controls ---------- */
+function setSidebarOpen(open) {
+  if (open) sidebar.classList.remove('w-0');
+  else sidebar.classList.add('w-0');
+  localStorage.setItem('nexus_sidebar', open ? '1' : '0');
+}
+function toggleSidebar() {
+  setSidebarOpen(sidebar.classList.contains('w-0'));
+}
+$('#sidebarToggleBtn').addEventListener('click', toggleSidebar);
+$('#sidebarCloseBtn').addEventListener('click', () => setSidebarOpen(false));
+$('#newChatBtn').addEventListener('click', newChat);
+$('#sidebarSettingsBtn').addEventListener('click', openSettingsModal);
+$('#clearBtn').addEventListener('click', newChat);
+
+/* ---------- Popover / files ---------- */
+plusBtn.addEventListener('click', e => { e.stopPropagation(); popover.classList.toggle('hidden'); });
+document.addEventListener('click', e => {
+  if (!popover.contains(e.target) && e.target !== plusBtn) popover.classList.add('hidden');
+});
+$('#uploadBtn').addEventListener('click', () => { popover.classList.add('hidden'); fileInput.click(); });
+$('#clearPopBtn').addEventListener('click', () => { popover.classList.add('hidden'); newChat(); });
+
+fileInput.addEventListener('change', () => {
+  const files = [...fileInput.files];
+  fileInput.value = '';
+  files.forEach(f => {
+    if (pendingFiles.length >= 5) { showToast(t('toast.maxFiles')); return; }
+    if (f.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = e => { f.dataUrl = e.target.result; renderPreviews(); };
+      reader.readAsDataURL(f);
+    }
+    pendingFiles.push(f);
+  });
+  renderPreviews();
+  updateSend();
+});
+
+function renderPreviews() {
+  previews.innerHTML = '';
+  if (!pendingFiles.length) { previews.classList.add('hidden'); return; }
+  previews.classList.remove('hidden');
+  pendingFiles.forEach((f, i) => {
+    const card = document.createElement('div');
+    card.className = 'relative group';
+    if (f.type.startsWith('image/') && f.dataUrl) {
+      card.innerHTML = '<img src="' + f.dataUrl + '" class="h-14 w-14 rounded-xl object-cover border border-white/10 shadow-lg" alt="">';
+    } else {
+      card.innerHTML = '<div class="h-14 flex items-center gap-2 pl-3 pr-8 rounded-xl bg-white/5 border border-white/10">' +
+        icon('file', 'w-5 h-5 text-violet-400 shrink-0') +
+        '<div class="min-w-0"><p class="text-xs font-medium text-slate-200 truncate max-w-[160px]">' + escapeHtml(f.name) + '</p>' +
+        '<p class="text-[10px] text-slate-500">' + fmtSize(f.size) + '</p></div></div>';
+    }
+    const rm = document.createElement('button');
+    rm.className = 'absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-slate-700 border border-slate-600 text-slate-300 hover:bg-rose-600 hover:text-white flex items-center justify-center shadow transition';
+    rm.innerHTML = icon('x', 'w-3 h-3');
+    rm.onclick = () => { pendingFiles.splice(i, 1); renderPreviews(); updateSend(); };
+    card.appendChild(rm);
+    previews.appendChild(card);
+  });
+}
+
+/* ---------- Modals / Settings ---------- */
+const themeSel = () => localStorage.getItem('nexus_theme') || 'dark';
+const watermarkOn = () => localStorage.getItem('nexus_watermark') !== 'off';
+function applyTheme() {
+  document.documentElement.classList.toggle('light', themeSel() === 'light');
+}
+function syncThemeUI() {
+  const light = themeSel() === 'light';
+  const d = $('#themeDark'), l = $('#themeLight');
+  if (d && l) { d.classList.toggle('seg-on', !light); l.classList.toggle('seg-on', light); }
+}
+function setTheme(t) {
+  localStorage.setItem('nexus_theme', t);
+  applyTheme();
+  syncThemeUI();
+  showToast(t === 'light' ? t('toast.themeLight') : t('toast.themeDark'));
+}
+function applyWatermark() {
+  const on = watermarkOn();
+  const sc = $('#sidebarCredit'), hc = $('#headerCredit'), t = $('#watermarkToggle');
+  if (sc) sc.classList.toggle('hidden', !on);
+  if (hc) hc.classList.toggle('hidden', !on);
+  if (t) t.classList.toggle('on', on);
+}
+function openSettingsModal() {
+  $('#sttLangSelect').value = sttLang;
+  $('#ttsRateSelect').value = String(ttsRate());
+  syncThemeUI();
+  syncLangUI();
+  const p = $('#personalizeToggle');
+  if (p) p.classList.toggle('on', localStorage.getItem('nexus_personalized') === 'on');
+  applyWatermark();
+  $('#settingsModal').classList.remove('hidden');
+}
+function closeSettingsModal() { $('#settingsModal').classList.add('hidden'); }
+$('#settingsBtn').addEventListener('click', openSettingsModal);
+$('#sttLangSelect').addEventListener('change', e => { applySttLang(e.target.value); });
+$('#ttsRateSelect').addEventListener('change', e => { localStorage.setItem('nexus_tts_rate', e.target.value); showToast(t('toast.tts')); });
+$('#clearChatsBtn').addEventListener('click', () => {
+  chats = [];
+  saveChats();
+  newChat();
+  showToast(t('toast.chatsDeleted'));
+});
+$('#themeDark').addEventListener('click', () => setTheme('dark'));
+$('#themeLight').addEventListener('click', () => setTheme('light'));
+$('#watermarkToggle').addEventListener('click', () => {
+  const on = !watermarkOn();
+  localStorage.setItem('nexus_watermark', on ? 'on' : 'off');
+  applyWatermark();
+  showToast(on ? t('toast.watermarkOn') : t('toast.watermarkOff'));
+});
+$('#personalizeToggle').addEventListener('click', () => {
+  const tg = $('#personalizeToggle');
+  const on = !tg.classList.contains('on');
+  tg.classList.toggle('on', on);
+  localStorage.setItem('nexus_personalized', on ? 'on' : 'off');
+  showToast(on ? t('toast.personalizedOn') : t('toast.personalizedOff'));
+});
+$('#settingsModal').addEventListener('click', e => {
+  const btn = e.target.closest('[data-info-i18n]');
+  if (!btn) return;
+  showToast(t(btn.dataset.infoI18n));
+});
+document.querySelectorAll('[data-close]').forEach(el => {
+  el.addEventListener('click', () => {
+    if (el.dataset.close === 'settings') closeSettingsModal();
+    else closeAuthModal();
+  });
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeSettingsModal(); closeAuthModal(); }
+});
+
+/* ---------- Language switcher ---------- */
+$('#langAr').addEventListener('click', () => setLang('ar'));
+$('#langFr').addEventListener('click', () => setLang('fr'));
+$('#langEn').addEventListener('click', () => setLang('en'));
+
+/* ---------- Firebase Auth ---------- */
+const isFileProtocol = location.protocol === 'file:';
+if (window.firebase) {
+  if (firebaseConfigured) {
+    try {
+      firebase.initializeApp(FIREBASE_CONFIG);
+      auth = firebase.auth();
+      auth.onAuthStateChanged(user => updateAuthUI(user));
+      if (firebase.analytics && FIREBASE_CONFIG.measurementId) {
+        try { firebase.analytics(); } catch (e) { console.warn('Analytics init failed:', e); }
+      }
+    } catch (e) {
+      console.warn('Firebase init failed:', e);
+    }
+  }
+} else {
+  console.warn('Firebase SDK failed to load (offline?)');
+}
+
+function openAuthModal() {
+  $('#authModal').classList.remove('hidden');
+  const configured = !!(window.firebase && firebaseConfigured && auth);
+  $('#authSetup').classList.toggle('hidden', configured);
+  $('#authForms').classList.toggle('hidden', !configured);
+  $('#authFileNotice').classList.toggle('hidden', !isFileProtocol);
+  $('#googleBtn').classList.toggle('hidden', isFileProtocol);
+  $('#googleBtn').classList.toggle('mb-3', !isFileProtocol);
+}
+function closeAuthModal() { $('#authModal').classList.add('hidden'); }
+
+let authMode = 'signin';
+function setAuthMode(mode) {
+  authMode = mode;
+  $('#tabSignIn').className = 'flex-1 h-9 rounded-lg text-sm font-semibold transition ' + (mode === 'signin' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white');
+  $('#tabSignUp').className = 'flex-1 h-9 rounded-lg text-sm font-semibold transition ' + (mode === 'signup' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-white');
+  $('#authName').classList.toggle('hidden', mode !== 'signup');
+  $('#authSubmit').textContent = mode === 'signin' ? t('auth.signin') : t('auth.signup');
+  hideAuthError();
+}
+function showAuthError(msg) {
+  const el = $('#authError');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+function hideAuthError() { $('#authError').classList.add('hidden'); }
+function friendlyAuthError(err) {
+  if (!err) return t('authErr.default');
+  switch (err.code) {
+    case 'auth/operation-not-supported-in-this-environment':
+      return t('authErr.env');
+    case 'auth/configuration-not-found':
+      return t('authErr.config');
+    case 'auth/invalid-api-key':
+      return t('authErr.apiKey');
+    case 'auth/unauthorized-domain':
+      return t('authErr.domain');
+    case 'auth/network-request-failed':
+      return t('authErr.network');
+    default:
+      return err.message || t('authErr.default');
+  }
+}
+
+$('#tabSignIn').addEventListener('click', () => setAuthMode('signin'));
+$('#tabSignUp').addEventListener('click', () => setAuthMode('signup'));
+
+$('#googleBtn').addEventListener('click', async () => {
+  if (!auth) { openAuthModal(); showAuthError(t('authErr.notConfigured')); return; }
+  if (isFileProtocol) { showAuthError(friendlyAuthError({ code: 'auth/operation-not-supported-in-this-environment' })); return; }
+  try {
+    await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+    closeAuthModal();
+    showToast(t('toast.signedInGoogle'));
+  } catch (err) {
+    if (err.code !== 'auth/popup-closed-by-user') showAuthError(friendlyAuthError(err));
+  }
+});
+
+$('#authForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!auth) { showAuthError(t('authErr.notConfigured')); return; }
+  const email = $('#authEmail').value.trim();
+  const password = $('#authPassword').value;
+  const name = $('#authName').value.trim();
+  const submit = $('#authSubmit');
+  submit.disabled = true;
+  submit.classList.add('opacity-50');
+  try {
+    if (authMode === 'signup') {
+      const cred = await auth.createUserWithEmailAndPassword(email, password);
+      if (name && cred.user) await cred.user.updateProfile({ displayName: name });
+      showToast(t('toast.accountCreated'));
+    } else {
+      await auth.signInWithEmailAndPassword(email, password);
+      showToast(t('toast.signedIn'));
+    }
+    closeAuthModal();
+    $('#authForm').reset();
+  } catch (err) {
+    showAuthError(friendlyAuthError(err));
+  } finally {
+    submit.disabled = false;
+    submit.classList.remove('opacity-50');
+  }
+});
+
+function updateAuthUI(user) {
+  authArea.innerHTML = '';
+  if (user) {
+    const name = user.displayName || (user.email ? user.email.split('@')[0] : t('auth.user'));
+    const initials = name.split(/\s+/).filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+    const wrap = document.createElement('div');
+    wrap.className = 'relative';
+    const avatarBtn = document.createElement('button');
+    avatarBtn.title = t('auth.account');
+    avatarBtn.className = 'w-9 h-9 rounded-full overflow-hidden border border-white/15 hover:border-violet-400/60 transition flex items-center justify-center bg-gradient-to-br from-violet-600 to-cyan-500 text-white text-[12px] font-bold shadow-lg';
+    avatarBtn.innerHTML = user.photoURL
+      ? '<img src="' + escapeHtml(user.photoURL) + '" class="w-full h-full object-cover" alt="avatar">'
+      : escapeHtml(initials || 'U');
+    const menu = document.createElement('div');
+    menu.className = 'hidden absolute right-0 top-11 w-56 bg-[#121a2e] border border-white/10 rounded-xl shadow-2xl shadow-black/60 p-2 z-40';
+    menu.innerHTML =
+      '<div class="px-3 py-2 border-b border-white/5 mb-1">' +
+        '<p class="text-[13px] font-semibold text-slate-100 truncate">' + escapeHtml(name) + '</p>' +
+        '<p class="text-[11px] text-slate-500 truncate">' + escapeHtml(user.email || '') + '</p>' +
+      '</div>' +
+      '<button class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-rose-500/10 text-[13px] text-rose-300 transition text-left">' +
+        icon('trash', 'w-4 h-4') + '<span>' + t('auth.signout') + '</span></button>';
+    avatarBtn.onclick = e => { e.stopPropagation(); menu.classList.toggle('hidden'); };
+    menu.querySelector('button').onclick = async () => {
+      try { await auth.signOut(); } catch (e) {}
+      menu.classList.add('hidden');
+      showToast(t('toast.signedOut'));
+    };
+    document.addEventListener('click', e => { if (!wrap.contains(e.target)) menu.classList.add('hidden'); });
+    wrap.appendChild(avatarBtn);
+    wrap.appendChild(menu);
+    authArea.appendChild(wrap);
+  } else {
+    const b = document.createElement('button');
+    b.className = 'h-9 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:brightness-110 transition text-[13px] font-semibold shadow-lg shadow-fuchsia-900/40';
+    b.textContent = t('auth.signin');
+    b.onclick = openAuthModal;
+    authArea.appendChild(b);
+  }
+}
+
+/* ---------- Text to speech ---------- */
+let cachedVoices = [];
+function loadVoices() {
+  if ('speechSynthesis' in window) cachedVoices = speechSynthesis.getVoices();
+}
+if ('speechSynthesis' in window) {
+  loadVoices();
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
+function pickVoice(lang) {
+  const prefix = lang.split('-')[0];
+  return cachedVoices.find(v => v.lang === lang) ||
+         cachedVoices.find(v => v.lang.startsWith(prefix)) ||
+         cachedVoices.find(v => v.lang.startsWith('en')) || cachedVoices[0];
+}
+function onSpeak(btn) {
+  if (!('speechSynthesis' in window)) { showToast(t('toast.ttsUnsupported')); return; }
+  if (speakingBtn === btn && speechSynthesis.speaking) { speechSynthesis.cancel(); return; }
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(btn.dataset.text);
+  u.lang = btn.dataset.lang || 'en-US';
+  const v = pickVoice(u.lang);
+  if (v) u.voice = v;
+  u.rate = ttsRate();
+  u.onstart = () => { speakingBtn = btn; btn.innerHTML = icon('stop', 'w-3.5 h-3.5'); btn.classList.add('text-violet-400'); };
+  u.onend = u.onerror = () => {
+    if (speakingBtn === btn) { speakingBtn = null; btn.innerHTML = icon('speak', 'w-3.5 h-3.5'); btn.classList.remove('text-violet-400'); }
+  };
+  speechSynthesis.speak(u);
+}
+
+/* ---------- Speech to text ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+micBtn.addEventListener('click', () => {
+  if (!SR) { showToast(t('toast.sttUnsupported')); return; }
+  if (listening) { rec.stop(); return; }
+  rec = new SR();
+  rec.lang = sttLang;
+  rec.interimResults = true;
+  rec.continuous = false;
+  const base = input.value;
+  let finalText = '', interimText = '';
+  rec.onresult = e => {
+    finalText = ''; interimText = '';
+    for (const r of e.results) {
+      if (r.isFinal) finalText += r[0].transcript;
+      else interimText += r[0].transcript;
+    }
+    input.value = base + finalText + interimText;
+    autoGrow(); updateSend();
+  };
+  rec.onerror = e => {
+    if (e.error === 'not-allowed') showToast(t('toast.micDenied'));
+    else if (e.error !== 'aborted') showToast(tf('toast.micError', { e: e.error }));
+  };
+  rec.onend = () => { listening = false; micBtn.classList.remove('mic-live', 'text-red-400', 'bg-red-500/10'); };
+  listening = true;
+  micBtn.classList.add('mic-live', 'text-red-400', 'bg-red-500/10');
+  try { rec.start(); } catch (err) {
+    listening = false;
+    micBtn.classList.remove('mic-live', 'text-red-400', 'bg-red-500/10');
+    showToast(t('toast.micStartFail'));
+  }
+});
+
+/* ---------- Language toggle ---------- */
+langBtn.addEventListener('click', () => {
+  applySttLang(sttLang === 'en-US' ? 'ar-SA' : 'en-US');
+});
+
+/* ---------- Copy ---------- */
+function onCopy(btn) {
+  const text = btn.dataset.text || '';
+  const done = () => {
+    btn.innerHTML = icon('check', 'w-3.5 h-3.5');
+    setTimeout(() => { btn.innerHTML = icon('copy', 'w-3.5 h-3.5'); }, 1500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => { showToast(t('toast.copyFail')); });
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { showToast(t('toast.copyFail')); }
+    ta.remove();
+  }
+}
+
+/* ---------- Init ---------- */
+applyTheme();
+applyWatermark();
+applyLang();
+chats = loadJSON('nexus_chats', []);
+activeChatId = localStorage.getItem('nexus_active_chat');
+applySttLang(localStorage.getItem('nexus_stt_lang') || 'en-US');
+const storedSidebar = localStorage.getItem('nexus_sidebar');
+if (storedSidebar === '0') sidebar.classList.add('w-0');
+else if (storedSidebar === null && window.innerWidth < 768) sidebar.classList.add('w-0');
+
+renderModeBar();
+emptyTagline.textContent = TL(currentMode);
+renderSuggestions();
+
+const savedChat = chats.find(c => c.id === activeChatId);
+if (savedChat) {
+  loadChat(savedChat);
+} else {
+  activeChatId = null;
+  appendWelcome(currentMode);
+}
+renderSidebar();
+updateAuthUI(auth ? auth.currentUser : null);
+</script>
+</body>
+</html>
